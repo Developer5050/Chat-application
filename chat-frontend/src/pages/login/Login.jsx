@@ -10,7 +10,6 @@ import { Link } from "react-router-dom";
 import { SiFacebook } from "react-icons/si";
 import { FcGoogle } from "react-icons/fc";
 
-
 const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
@@ -32,8 +31,8 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-50 flex items-center justify-center p-4 font-ubuntu">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 md:p-10">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-50 flex items-center justify-center p-4 font-serif">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-7">
         {/* Top Icon and Heading */}
         <div className="text-center mb-3">
           <div className="flex justify-center items-center gap-2 mb-2">
@@ -49,8 +48,8 @@ const Login = () => {
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-5">
+          <div className="space-y-5">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <FaEnvelope className="text-gray-500" />
@@ -89,7 +88,7 @@ const Login = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
             <div className="flex items-center">
               <input
                 id="remember-me"
@@ -140,11 +139,11 @@ const Login = () => {
 
           <div className="mt-5 grid grid-cols-2 gap-3">
             <button className="w-full inline-flex items-center justify-center py-2 px-1 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300">
-              <FcGoogle className="h-5 w-5 "/>{" "}
+              <FcGoogle className="h-5 w-5" />
               <span className="ml-2">Google</span>
             </button>
             <button className="w-full inline-flex items-center justify-center py-2 px-1 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300">
-              <SiFacebook className="h-5 w-5 text-[#1877F2]" />{" "}
+              <SiFacebook className="h-5 w-5 text-[#1877F2]" />
               <span className="ml-2">Facebook</span>
             </button>
           </div>
@@ -152,7 +151,7 @@ const Login = () => {
 
         {/* Sign Up Link */}
         <div className="mt-6 text-center">
-          <p className="text-gray-600 text-[15px]">
+          <p className="text-gray-600 text-[14px]">
             Don't have an account?{" "}
             <Link
               to="/signup"
