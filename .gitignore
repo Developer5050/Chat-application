@@ -1,0 +1,49 @@
+# =======================
+# Global ignores
+# =======================
+.DS_Store
+Thumbs.db
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.pid
+*.seed
+*.pid.lock
+*.tgz
+*.zip
+*.tar.gz
+*.7z
+.vscode/
+.idea/
+
+# =======================
+# Backend (chat-backend)
+# =======================
+chat-backend/node_modules/
+chat-backend/package-lock.json
+chat-backend/.env
+chat-backend/.env.local
+chat-backend/.env.development.local
+chat-backend/.env.test.local
+chat-backend/.env.production.local
+chat-backend/coverage/
+chat-backend/dist/
+chat-backend/tmp/
+chat-backend/.cache/
+
+# =======================
+# Frontend (chat-frontend)
+# =======================
+chat-frontend/node_modules/
+chat-frontend/package-lock.json
+chat-frontend/.env
+chat-frontend/.env.local
+chat-frontend/.env.development.local
+chat-frontend/.env.test.local
+chat-frontend/.env.production.local
+chat-frontend/build/
+chat-frontend/coverage/
+chat-frontend/.cache/
+chat-frontend/.DS_Store
