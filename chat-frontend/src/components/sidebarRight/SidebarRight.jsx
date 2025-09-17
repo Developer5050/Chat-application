@@ -3,8 +3,8 @@ import { IoMdSearch } from "react-icons/io";
 import { FaEllipsisVertical } from "react-icons/fa6";
 import { MdOutlineGroupAdd, MdLogout } from "react-icons/md";
 import Logo from "../../assets/logo2.jpeg";
-import ChatList from "../chatList/ChatList"
-
+import ChatList from "../chatList/ChatList";
+import "./sidebar.css";
 const SidebarRight = ({
   isDropdownOpen,
   setIsDropdownOpen,
@@ -17,7 +17,7 @@ const SidebarRight = ({
   setSearchPlaceholder,
 }) => {
   return (
-    <div className="w-1/3 bg-white flex flex-col border-r">
+    <div className="w-1/3 bg-white flex flex-col border-r custom-width">
       {/* Header */}
       <div className="p-3 flex justify-between items-center h-16">
         <img src={Logo} alt="Logo" width={50} height={50} />

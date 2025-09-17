@@ -1,0 +1,5 @@
+@media (max-width: 426px) {
+  .custom-width {
+    width: 60% !important;
+  }
+}

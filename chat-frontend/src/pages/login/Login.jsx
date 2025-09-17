@@ -1,14 +1,9 @@
 import React, { useState } from "react";
-import {
-  FaEnvelope,
-  FaLock,
-  FaEye,
-  FaEyeSlash,
-  FaComments,
-} from "react-icons/fa";
+import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { SiFacebook } from "react-icons/si";
 import { FcGoogle } from "react-icons/fc";
+import Logo from "../../assets/logo2.jpeg";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -31,13 +26,13 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-50 flex items-center justify-center p-4 font-ubuntu">
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 to-purple-200 flex items-center justify-center p-4 font-ubuntu">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-7">
         {/* Top Icon and Heading */}
         <div className="text-center mb-3">
-          <div className="flex justify-center items-center gap-2 mb-2">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-md">
-              <FaComments className="text-2xl text-white" />
+          <div className="flex justify-center items-center gap-1 mb-2">
+            <div className="w-12 h-12 shadow-md">
+              <img src={Logo} alt="Smart Chat Logo" />
             </div>
             <h2 className="text-2xl font-bold text-gray-800">Sign In</h2>
           </div>
@@ -151,7 +146,7 @@ const Login = () => {
 
         {/* Sign Up Link */}
         <div className="mt-6 text-center">
-          <p className="text-gray-600 text-[14px]">
+          <p className="text-gray-700 text-[14px]">
             Don't have an account?{" "}
             <Link
               to="/signup"

@@ -16,7 +16,7 @@ const SidebarLeft = () => {
           <div
             className="absolute left-full top-1/2 -translate-y-1/2 ml-3 
             bg-black text-white text-[14px] px-3 py-0.5 rounded-full z-50
-            opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg"
+           hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
           >
             Chat
           </div>
@@ -30,7 +30,7 @@ const SidebarLeft = () => {
           <div
             className="absolute left-full top-1/2 -translate-y-1/2 ml-3
            bg-black text-white text-[14px] px-3 py-0.5 rounded-full z-50
-           opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg"
+           hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
           >
             Invite
           </div>
@@ -44,7 +44,7 @@ const SidebarLeft = () => {
           <div
             className="absolute left-full top-1/2 -translate-y-1/2 ml-3 
             bg-black text-white text-[14px] px-3 py-0.5 rounded-full  z-50
-           opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg"
+          hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
           >
             Status
           </div>
@@ -58,7 +58,7 @@ const SidebarLeft = () => {
           <div
             className="absolute left-full top-1/2 -translate-y-1/2 ml-3 
            bg-black text-white text-[14px] px-3 py-0.5 rounded-full  z-50
-           opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg"
+           hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
           >
             Communities
           </div>
@@ -72,7 +72,7 @@ const SidebarLeft = () => {
           <div
             className="absolute left-full top-1/2 -translate-y-1/2 ml-3 
             bg-black text-white text-[14px] px-3 py-0.5 rounded-full  z-50
-            opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg"
+            hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
           >
             Settings
           </div>
@@ -90,7 +90,7 @@ const SidebarLeft = () => {
           <div
             className="absolute left-full top-1/2 -translate-y-1/2 ml-3 
            bg-black text-white text-[14px] px-3 py-0.5 rounded-full  z-50
-           opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg"
+           hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
           >
             Profile
           </div>

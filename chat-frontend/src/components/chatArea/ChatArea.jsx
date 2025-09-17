@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { PiVideoCameraFill } from "react-icons/pi";
 import { MdLocalPhone } from "react-icons/md";
 import { FaEllipsisVertical, FaPlus, FaMicrophone } from "react-icons/fa6";
 import { FaRegSmile } from "react-icons/fa";
 import { IoSend } from "react-icons/io5";
+import EmojiPicker from "emoji-picker-react";
 import whatsappBg from "../../assets/whatsapp1.jpg";
 
 const ChatArea = ({
@@ -15,6 +16,32 @@ const ChatArea = ({
   handleSendMessage,
   handleKeyPress,
 }) => {
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef(null);
+
+  // Handle emoji click
+  const onEmojiClick = (emojiObject) => {
+    setNewMessage((prev) => prev + emojiObject.emoji);
+    // Picker remains open for multiple selections
+  };
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
@@ -83,14 +110,22 @@ const ChatArea = ({
       </div>
 
       {/* Input */}
-      <div className="p-4 flex items-center">
-        <div className="flex-1 flex items-center bg-white rounded-full px-4 py-1 shadow-sm border border-gray-300">
+      <div className="p-3 flex items-center bg-white relative">
+        <div className="flex-1 flex items-center rounded-full px-3 py-2 shadow-sm border border-gray-300 bg-white">
+          {/* Plus Icon */}
           <button className="text-gray-500 mr-3">
             <FaPlus />
           </button>
-          <button className="text-gray-500 mr-3">
+
+          {/* Emoji Icon */}
+          <button
+            className="text-gray-500 mr-3"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          >
             <FaRegSmile />
           </button>
+
+          {/* Input Field */}
           <input
             type="text"
             className="flex-1 focus:outline-none bg-transparent"
@@ -99,19 +134,31 @@ const ChatArea = ({
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={handleKeyPress}
           />
+
+          {/* Conditional Mic / Send */}
           {newMessage.trim() === "" ? (
-            <button className="text-gray-500 ml-3 py-2 px-2 rounded-full hover:bg-green-700 hover:text-white">
+            <button className="text-gray-500 ml-3">
               <FaMicrophone className="text-lg" />
             </button>
           ) : (
             <button
-              className="text-white bg-green-600 py-2 px-2 rounded-full ml-2"
+              className="text-white bg-green-600 p-2 rounded-full ml-2"
               onClick={handleSendMessage}
             >
               <IoSend className="text-xl" />
             </button>
           )}
         </div>
+
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div
+            ref={emojiPickerRef}
+            className="absolute bottom-14 left-3 z-50 shadow-lg"
+          >
+            <EmojiPicker onEmojiClick={onEmojiClick} />
+          </div>
+        )}
       </div>
     </div>
   );

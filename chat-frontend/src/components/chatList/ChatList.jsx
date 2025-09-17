@@ -1,6 +1,6 @@
 import React from "react";
 
-const ChatList = ({ filteredChats, setActiveChat }) => {
+const ChatList = ({ filteredChats = [], setActiveChat  }) => {
   return (
     <div className="flex-1 overflow-y-auto mt-2">
       {filteredChats.slice(0, 11).map((chat, index) => (
