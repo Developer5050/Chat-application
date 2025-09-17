@@ -36,7 +36,7 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-50 flex items-center justify-center p-4 font-serif">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-50 flex items-center justify-center p-4 font-ubuntu">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-7">
         {/* Heading with Logo */}
         <div className="text-center mb-3">
@@ -47,8 +47,8 @@ const Signup = () => {
             <h2 className="text-2xl font-bold text-gray-800">Sign up</h2>
           </div>
 
-          <p className="text-gray-600 font-ubuntu text-[14px]">
-            Chat instantly. Connect globally.
+          <p className="text-gray-600 font-ubuntu text-[13px]">
+            Chat instantly. Connect globally with Smart Chat
           </p>
         </div>
 
@@ -157,9 +157,9 @@ const Signup = () => {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 py-w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 hover:from-blue-700 hover:to-purple-700 shadow-md hover:shadow-lg px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300"
+            className="w-full text-[14px] bg-blue-600 py-w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 hover:from-blue-700 hover:to-purple-700 shadow-md hover:shadow-lg px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300"
           >
-            Create Account
+           Sign Up
           </button>
         </form>
 

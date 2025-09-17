@@ -31,7 +31,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-50 flex items-center justify-center p-4 font-serif">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-50 flex items-center justify-center p-4 font-ubuntu">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-7">
         {/* Top Icon and Heading */}
         <div className="text-center mb-3">
@@ -42,7 +42,7 @@ const Login = () => {
             <h2 className="text-2xl font-bold text-gray-800">Sign In</h2>
           </div>
 
-          <p className="text-gray-600 font-ubuntu text-[14px]">
+          <p className="text-gray-600 font-ubuntu text-[13px]">
             Chat. Share. Connect with friends instantly 💬
           </p>
         </div>
@@ -118,7 +118,7 @@ const Login = () => {
 
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 shadow-md hover:shadow-lg"
+            className="w-full text-[14px] bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 shadow-md hover:shadow-lg"
           >
             Sign In
           </button>
