@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { SiFacebook } from "react-icons/si";
 import { FcGoogle } from "react-icons/fc";
 import Logo from "../../assets/logo2.jpeg";
+import useApiHook from "../../hooks/useApiHook";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -12,6 +13,8 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const navigate = useNavigate();
+  const { loading, error, data, apiCall } = useApiHook();
 
   const handleChange = (e) => {
     setFormData({
@@ -20,9 +23,21 @@ const Login = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login data:", formData);
+
+    const response = await apiCall(
+      "http://localhost:5000/api/auth/login",
+      "POST",
+      formData
+    );
+
+    if (response) {
+      console.log("Login success:", response);
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+      navigate("/chat-ui");
+    }
   };
 
   return (
@@ -41,6 +56,11 @@ const Login = () => {
             Chat. Share. Connect with friends instantly 💬
           </p>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <p className="text-red-600 text-center text-sm mb-3">{error}</p>
+        )}
 
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4 mt-5">
@@ -113,11 +133,14 @@ const Login = () => {
 
           <button
             type="submit"
+            disabled={loading}
             className="w-full text-[14px] bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 shadow-md hover:shadow-lg"
           >
-            Sign In
+            {loading ? "Signing In..." : "Sign In"}
           </button>
         </form>
+
+        {data && <p style={{ color: "green" }}>{data.message}</p>}
 
         {/* Social Login */}
         <div className="mt-5">

@@ -1,15 +1,8 @@
 import React, { useState } from "react";
-import {
-  FaUser,
-  FaEnvelope,
-  FaLock,
-  FaEye,
-  FaEyeSlash,
-} from "react-icons/fa";
-import { Link } from "react-router-dom";
+import { FaUser, FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
+import { Link, useNavigate } from "react-router-dom";
 import Logo from "../../assets/logo2.jpeg";
-
-
+import useApiHook from "../../hooks/useApiHook";
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -18,6 +11,8 @@ const Signup = () => {
     password: "",
     confirmPassword: "",
   });
+  const navigate = useNavigate();
+  const { loading, error, data, apiCall } = useApiHook();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -28,15 +23,22 @@ const Signup = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Signup data:", formData);
+    const response = await apiCall(
+      "http://localhost:5000/api/auth/register",
+      "POST",
+      formData
+    );
+    if (response) {
+      console.log("Signup success:", response);
+      navigate("/");
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-200 to-purple-200 flex items-center justify-center p-4 font-ubuntu">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-7">
-        {/* Heading with Logo */}
         <div className="text-center mb-3">
           <div className="flex justify-center items-center gap-1 mb-2">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-md">
@@ -135,7 +137,10 @@ const Signup = () => {
               className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               required
             />
-            <label htmlFor="terms" className="ml-2 block text-[13px] text-gray-700">
+            <label
+              htmlFor="terms"
+              className="ml-2 block text-[13px] text-gray-700"
+            >
               I agree to the{" "}
               <a
                 href="#"
@@ -156,12 +161,15 @@ const Signup = () => {
           <button
             type="submit"
             className="w-full text-[14px] bg-blue-600 py-w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 hover:from-blue-700 hover:to-purple-700 shadow-md hover:shadow-lg px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300"
+            disabled={loading}
           >
-           Sign Up
+            {loading ? "Signing Up..." : "Sign Up"}
           </button>
         </form>
 
-  
+        {/* Show error or success */}
+        {error && <p style={{ color: "red" }}>{error}</p>}
+        {data && <p style={{ color: "green" }}>{data.message}</p>}
 
         <div className="mt-6 text-center">
           <p className="text-gray-700 text-[14px]">

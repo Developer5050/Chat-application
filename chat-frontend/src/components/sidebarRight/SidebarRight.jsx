@@ -7,6 +7,7 @@ import { FaPencilAlt } from "react-icons/fa";
 import Logo from "../../assets/logo2.jpeg";
 import ChatList from "../chatList/ChatList";
 import "./sidebar.css";
+import useLogout from "../../hooks/useLogoutHook";
 
 const SidebarRight = ({
   isDropdownOpen,
@@ -24,6 +25,8 @@ const SidebarRight = ({
   const [name, setName] = useState("Ahmad Shoukat");
   const [about, setAbout] = useState("Available");
   const [phone, setPhone] = useState("+92 300 1234567");
+
+  const { logout } = useLogout();
 
   return (
     <div className="w-1/3 bg-white flex flex-col border-r custom-width">
@@ -141,7 +144,10 @@ const SidebarRight = ({
                     </button>
                   </div>
                   <div className="px-2">
-                    <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
+                    <button
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md"
+                      onClick={logout}
+                    >
                       <MdLogout className="text-lg" />
                       <span className="ml-2">Logout</span>
                     </button>
