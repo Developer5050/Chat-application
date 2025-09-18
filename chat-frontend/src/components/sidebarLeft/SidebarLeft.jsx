@@ -4,7 +4,7 @@ import { IoMdAddCircleOutline, IoMdPeople } from "react-icons/io";
 import { IoSettingsOutline } from "react-icons/io5";
 import { CgProfile } from "react-icons/cg";
 
-const SidebarLeft = () => {
+const SidebarLeft = ({ setActiveView }) => {
   return (
     <div className="w-14 bg-white flex flex-col items-center py-4 border border-collapse border-gray-300">
       <div className="flex flex-col space-y-2">
@@ -24,13 +24,16 @@ const SidebarLeft = () => {
 
         {/* Invite */}
         <div className="relative group">
-          <button className="text-black hover:text-black p-2 rounded-full hover:bg-gray-200">
+          <button
+            className="text-black hover:text-black p-2 rounded-full hover:bg-gray-200"
+            onClick={() => setActiveView("invite")}
+          >
             <IoMdAddCircleOutline className="w-5 h-5" />
           </button>
           <div
             className="absolute left-full top-1/2 -translate-y-1/2 ml-3
-           bg-black text-white text-[14px] px-3 py-0.5 rounded-full z-50
-           hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
+     bg-black text-white text-[14px] px-3 py-0.5 rounded-full z-50
+     hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
           >
             Invite
           </div>
@@ -84,13 +87,16 @@ const SidebarLeft = () => {
       <div className="mt-auto">
         {/* Profile */}
         <div className="relative group">
-          <button className="text-black p-2 rounded-full hover:bg-gray-200">
+          <button
+            className="text-black p-2 rounded-full hover:bg-gray-200"
+            onClick={() => setActiveView("profile")}
+          >
             <CgProfile className="w-5 h-5" />
           </button>
           <div
             className="absolute left-full top-1/2 -translate-y-1/2 ml-3 
-           bg-black text-white text-[14px] px-3 py-0.5 rounded-full  z-50
-           hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
+     bg-black text-white text-[14px] px-3 py-0.5 rounded-full  z-50
+     hidden group-hover:flex transition-opacity whitespace-nowrap shadow-lg"
           >
             Profile
           </div>

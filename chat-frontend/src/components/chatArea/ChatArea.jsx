@@ -1,9 +1,35 @@
 import React, { useState, useRef, useEffect } from "react";
 import { PiVideoCameraFill } from "react-icons/pi";
-import { MdLocalPhone } from "react-icons/md";
-import { FaEllipsisVertical, FaPlus, FaMicrophone } from "react-icons/fa6";
-import { FaRegSmile } from "react-icons/fa";
-import { IoSend } from "react-icons/io5";
+import {
+  MdLocalPhone,
+  MdFavoriteBorder,
+  MdBlockFlipped,
+  MdEvent,
+} from "react-icons/md";
+import { FcInvite } from "react-icons/fc";
+
+import {
+  FaEllipsisVertical,
+  FaPlus,
+  FaMicrophone,
+} from "react-icons/fa6";
+import { FaRegSmile, FaTimes, FaPollH } from "react-icons/fa";
+import {
+  IoSend,
+  IoCloseCircleOutline,
+  IoDocumentText,
+  IoPerson,
+} from "react-icons/io5";
+import {
+  IoMdInformationCircleOutline,
+  IoIosRemoveCircleOutline,
+  IoMdPhotos,
+} from "react-icons/io";
+import { LuThumbsDown } from "react-icons/lu";
+import { BiMessageSquareCheck } from "react-icons/bi";
+import { BsMicMute } from "react-icons/bs";
+import { SlSpeedometer } from "react-icons/sl";
+import { RiDeleteBin6Line } from "react-icons/ri";
 import EmojiPicker from "emoji-picker-react";
 import whatsappBg from "../../assets/whatsapp1.jpg";
 
@@ -15,17 +41,18 @@ const ChatArea = ({
   setNewMessage,
   handleSendMessage,
   handleKeyPress,
+  activeView,
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [openPlus, setOpenPlus] = useState(false);
 
   // Handle emoji click
   const onEmojiClick = (emojiObject) => {
     setNewMessage((prev) => prev + emojiObject.emoji);
-    // Picker remains open for multiple selections
   };
 
-  // Close emoji picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -41,6 +68,28 @@ const ChatArea = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  const toggleOpen = () => {
+    setIsOpen(!isOpen);
+  };
+
+  if (activeView === "invite") {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
+        <FcInvite className="text-5xl text-gray-500 mb-2 mr-2" />
+        <h2 className="text-2xl font-medium text-gray-700">Invite</h2>
+      </div>
+    );
+  }
+
+  if (activeView === "profile") {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
+        <IoPerson className="text-5xl text-gray-500 mb-3 mr-2" />
+        <h2 className="text-2xl font-medium text-gray-700">Profile</h2>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col">
@@ -73,9 +122,90 @@ const ChatArea = ({
           <button className="text-black w-10 h-10 flex items-center justify-center text-xl">
             <MdLocalPhone />
           </button>
-          <button className="text-black w-10 h-10 flex items-center justify-center text-xl">
-            <FaEllipsisVertical />
-          </button>
+
+          <div className="relative">
+            <button
+              className="text-black w-10 h-10 flex items-center justify-center text-xl"
+              onClick={toggleOpen}
+            >
+              <FaEllipsisVertical />
+            </button>
+            {isOpen && (
+              <div className="absolute right-2 mt-1 w-56 bg-white rounded-xl shadow-2xl py-1 z-10">
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
+                    <IoMdInformationCircleOutline className="text-lg" />
+                    <span className="ml-3">Contact Info</span>
+                  </button>
+                </div>
+
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
+                    <BiMessageSquareCheck className="text-lg" />
+                    <span className="ml-3">Select messages</span>
+                  </button>
+                </div>
+
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
+                    <BsMicMute className="text-lg" />
+                    <span className="ml-3">Mute notifications</span>
+                  </button>
+                </div>
+
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
+                    <SlSpeedometer className="text-md" />
+                    <span className="ml-3">Disappearing messages</span>
+                  </button>
+                </div>
+
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
+                    <MdFavoriteBorder className="text-lg" />
+                    <span className="ml-3">Add to favourites</span>
+                  </button>
+                </div>
+
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
+                    <IoCloseCircleOutline className="text-lg" />
+                    <span className="ml-3">Close chat</span>
+                  </button>
+                </div>
+
+                <hr className="h-2 w-48 ml-4 text-gray-300 mt-3" />
+
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-700 w-full rounded-md">
+                    <LuThumbsDown className="text-lg" />
+                    <span className="ml-3">Report</span>
+                  </button>
+                </div>
+
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700  hover:bg-red-100 hover:text-red-700 w-full rounded-md">
+                    <MdBlockFlipped className="text-lg" />
+                    <span className="ml-3">Block</span>
+                  </button>
+                </div>
+
+                <div className="px-2">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700  hover:bg-red-100 hover:text-red-700 w-full rounded-md">
+                    <IoIosRemoveCircleOutline className="text-lg" />
+                    <span className="ml-3">Clear chat</span>
+                  </button>
+                </div>
+
+                <div className="px-2">
+                  <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-700 rounded-md">
+                    <RiDeleteBin6Line className="text-lg" />
+                    <span className="ml-3">Delete Chat</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -111,21 +241,59 @@ const ChatArea = ({
 
       {/* Input */}
       <div className="p-3 flex items-center bg-white relative">
-        <div className="flex-1 flex items-center rounded-full px-3 py-2 shadow-sm border border-gray-300 bg-white">
-          {/* Plus Icon */}
-          <button className="text-gray-500 mr-3">
-            <FaPlus />
+        <div className="flex-1 flex items-center rounded-full px-3 py-2 shadow-sm border border-gray-300 bg-white relative">
+          <button
+            type="button"
+            onClick={() => setOpenPlus(!openPlus)}
+            className="text-black hover:text-gray-700 mr-3"
+          >
+            {openPlus ? <FaTimes size={18} /> : <FaPlus size={18} />}
           </button>
 
-          {/* Emoji Icon */}
+          {openPlus && (
+            <div className="absolute bottom-14 -left-10 bg-white border rounded-xl shadow-md w-48 p-1">
+              <div className="px-2">
+                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
+                  <IoDocumentText className="text-lg text-purple-500" />
+                  <span className="ml-3">Document</span>
+                </button>
+              </div>
+              <div className="px-2">
+                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
+                  <IoMdPhotos className="text-lg text-blue-500" />
+                  <span className="ml-3">Photos & videos</span>
+                </button>
+              </div>
+              <div className="px-2">
+                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
+                  <IoPerson className="text-lg text-cyan-500" />
+                  <span className="ml-3">Contact</span>
+                </button>
+              </div>
+              <div className="px-2">
+                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
+                  <FaPollH className="text-lg text-yellow-500" />
+                  <span className="ml-3">Poll</span>
+                </button>
+              </div>
+              <div className="px-2">
+                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
+                  <MdEvent className="text-lg text-pink-500" />
+                  <span className="ml-3">Event</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Emoji Button */}
           <button
-            className="text-gray-500 mr-3"
+            className="text-black mr-3"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
           >
             <FaRegSmile />
           </button>
 
-          {/* Input Field */}
+          {/* Input */}
           <input
             type="text"
             className="flex-1 focus:outline-none bg-transparent"
@@ -135,9 +303,9 @@ const ChatArea = ({
             onKeyPress={handleKeyPress}
           />
 
-          {/* Conditional Mic / Send */}
+          {/* Mic / Send */}
           {newMessage.trim() === "" ? (
-            <button className="text-gray-500 ml-3">
+            <button className="text-black ml-3 hover:bg-green-600 hover:text-white py-2 px-2 rounded-full">
               <FaMicrophone className="text-lg" />
             </button>
           ) : (
