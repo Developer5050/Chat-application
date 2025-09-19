@@ -19,6 +19,17 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
+    invites: [
+      {
+        from: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        status: {
+          type: String,
+          enum: ["pending", "accepted", "rejected"],
+          default: "pending",
+        },
+      },
+    ],
+    contacts: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );

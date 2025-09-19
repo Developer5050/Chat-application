@@ -96,7 +96,6 @@ const ChatUi = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeView, setActiveView] = useState("chats");
 
-
   const filteredChats = chats.filter((chat) => {
     if (activeFilter === "all") return true;
     if (activeFilter === "unread") return chat.unread > 0;
@@ -129,6 +128,8 @@ const ChatUi = () => {
     if (e.key === "Enter") handleSendMessage();
   };
 
+  const currentUser = JSON.parse(localStorage.getItem("user"));
+
   return (
     <div className="flex h-screen bg-gray-100 font-ubuntu">
       <SidebarLeft setActiveView={setActiveView} />
@@ -153,7 +154,8 @@ const ChatUi = () => {
         setNewMessage={setNewMessage}
         handleSendMessage={handleSendMessage}
         handleKeyPress={handleKeyPress}
-        activeView={activeView} 
+        activeView={activeView}
+        userId={currentUser?.id} // ✅ yahan "id" use karna hai
       />
     </div>
   );

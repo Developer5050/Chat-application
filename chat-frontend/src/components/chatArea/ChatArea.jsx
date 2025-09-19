@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { PiVideoCameraFill } from "react-icons/pi";
 import {
   MdLocalPhone,
   MdFavoriteBorder,
@@ -7,13 +6,8 @@ import {
   MdEvent,
 } from "react-icons/md";
 import { FcInvite } from "react-icons/fc";
-
-import {
-  FaEllipsisVertical,
-  FaPlus,
-  FaMicrophone,
-} from "react-icons/fa6";
-import { FaRegSmile, FaTimes, FaPollH } from "react-icons/fa";
+import { FaEllipsisVertical, FaPlus, FaMicrophone } from "react-icons/fa6";
+import { FaPoll, FaRegSmile, FaTimes } from "react-icons/fa";
 import {
   IoSend,
   IoCloseCircleOutline,
@@ -30,8 +24,13 @@ import { BiMessageSquareCheck } from "react-icons/bi";
 import { BsMicMute } from "react-icons/bs";
 import { SlSpeedometer } from "react-icons/sl";
 import { RiDeleteBin6Line } from "react-icons/ri";
+import { PiVideoCameraFill } from "react-icons/pi";
 import EmojiPicker from "emoji-picker-react";
 import whatsappBg from "../../assets/whatsapp1.jpg";
+import io from "socket.io-client";
+import Peer from "simple-peer";
+
+const socket = io("http://localhost:5000");
 
 const ChatArea = ({
   chats,
@@ -42,13 +41,21 @@ const ChatArea = ({
   handleSendMessage,
   handleKeyPress,
   activeView,
+  userId,
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
   const [openPlus, setOpenPlus] = useState(false);
 
-  // Handle emoji click
+  // --- Video/Audio Call States ---
+  const [stream, setStream] = useState(null);
+  const [call, setCall] = useState({});
+  const [callAccepted, setCallAccepted] = useState(false);
+  const myVideo = useRef(null);
+  const userVideo = useRef(null);
+  const connectionRef = useRef();
+
   const onEmojiClick = (emojiObject) => {
     setNewMessage((prev) => prev + emojiObject.emoji);
   };
@@ -62,17 +69,91 @@ const ChatArea = ({
         setShowEmojiPicker(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleOpen = () => {
-    setIsOpen(!isOpen);
+  const toggleOpen = () => setIsOpen(!isOpen);
+
+  useEffect(() => {
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: true })
+      .then((currentStream) => {
+        setStream(currentStream);
+        if (myVideo.current) myVideo.current.srcObject = currentStream;
+      });
+
+    if (!userId) {
+      console.error("⚠️ userId missing, call feature won't work");
+      return;
+    }
+
+    socket.emit("join", userId);
+
+    socket.on("call-made", ({ from, signal }) => {
+      setCall({ isReceivingCall: true, from, signal });
+    });
+
+    socket.on("call-accepted", (signal) => {
+      setCallAccepted(true);
+      if (connectionRef.current) {
+        connectionRef.current.signal(signal);
+      }
+    });
+
+    return () => {
+      socket.off("call-made");
+      socket.off("call-accepted");
+    };
+  }, [userId]);
+
+  // Caller function
+  const callUser = (id) => {
+     console.log("📞 Calling user:", id);
+    if (!id) return;
+    const peer = new Peer({ initiator: true, trickle: false, stream });
+
+    peer.on("signal", (data) => {
+      socket.emit("call-user", {
+        userToCall: id,
+        signalData: data,
+        from: userId,
+      });
+    });
+
+    peer.on("stream", (currentStream) => {
+      if (userVideo.current) userVideo.current.srcObject = currentStream;
+    });
+
+    connectionRef.current = peer;
   };
 
+  // Receiver function
+  const answerCall = () => {
+    if (!call.from) return;
+
+    setCallAccepted(true);
+    const peer = new Peer({ initiator: false, trickle: false, stream });
+
+    peer.on("signal", (data) => {
+      socket.emit("answer-call", {
+        to: call.from,
+        signal: data,
+      });
+    });
+
+    peer.on("stream", (currentStream) => {
+      if (userVideo.current) userVideo.current.srcObject = currentStream;
+    });
+
+    peer.signal(call.signal);
+    connectionRef.current = peer;
+  };
+
+  // Safe receiverId
+  const receiverId = chats.find((c) => c.id === activeChat)?.userId || null;
+
+  // --- Render special views ---
   if (activeView === "invite") {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
@@ -91,6 +172,7 @@ const ChatArea = ({
     );
   }
 
+  // --- Main Chat Area ---
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
@@ -115,23 +197,34 @@ const ChatArea = ({
           </div>
         </div>
 
-        <div className="flex space-x-2">
-          <button className="text-black w-10 h-10 flex items-center justify-center text-xl">
+        <div className="flex items-center space-x-2 text-black text-xl">
+          {/* Video Call Button */}
+          <button
+            className="w-10 h-10 flex items-center justify-center"
+            onClick={() => receiverId && callUser(receiverId)}
+          >
             <PiVideoCameraFill />
           </button>
-          <button className="text-black w-10 h-10 flex items-center justify-center text-xl">
+
+          {/* Audio Call Button */}
+          <button
+            className="w-10 h-10 flex items-center justify-center"
+            onClick={() => receiverId && callUser(receiverId)}
+          >
             <MdLocalPhone />
           </button>
 
+          {/* Dropdown Button */}
           <div className="relative">
             <button
-              className="text-black w-10 h-10 flex items-center justify-center text-xl"
+              className="w-10 h-10 flex items-center justify-center"
               onClick={toggleOpen}
             >
               <FaEllipsisVertical />
             </button>
+
             {isOpen && (
-              <div className="absolute right-2 mt-1 w-56 bg-white rounded-xl shadow-2xl py-1 z-10">
+              <div className="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-2xl py-1 z-10">
                 <div className="px-2">
                   <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
                     <IoMdInformationCircleOutline className="text-lg" />
@@ -184,14 +277,14 @@ const ChatArea = ({
                 </div>
 
                 <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700  hover:bg-red-100 hover:text-red-700 w-full rounded-md">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-700 w-full rounded-md">
                     <MdBlockFlipped className="text-lg" />
                     <span className="ml-3">Block</span>
                   </button>
                 </div>
 
                 <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700  hover:bg-red-100 hover:text-red-700 w-full rounded-md">
+                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-700 w-full rounded-md">
                     <IoIosRemoveCircleOutline className="text-lg" />
                     <span className="ml-3">Clear chat</span>
                   </button>
@@ -207,6 +300,51 @@ const ChatArea = ({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Video Elements */}
+      <div className="flex gap-4 p-2">
+        {stream && (
+          <video
+            playsInline
+            muted
+            ref={myVideo}
+            autoPlay
+            style={{ width: "200px", borderRadius: "10px" }}
+          />
+        )}
+
+        {callAccepted && (
+          <video
+            playsInline
+            ref={userVideo}
+            autoPlay
+            style={{ width: "200px", borderRadius: "10px" }}
+          />
+        )}
+
+        {/* Incoming Call UI */}
+        {call.isReceivingCall && !callAccepted && (
+          <div className="flex flex-col items-start bg-white shadow-md rounded-lg p-3">
+            <p className="text-sm font-medium mb-2 text-gray-700">
+              {call.from} is calling...
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={answerCall}
+                className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => setCall({})}
+                className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -272,7 +410,7 @@ const ChatArea = ({
               </div>
               <div className="px-2">
                 <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
-                  <FaPollH className="text-lg text-yellow-500" />
+                  <FaPoll className="text-lg text-yellow-500" />
                   <span className="ml-3">Poll</span>
                 </button>
               </div>
@@ -285,7 +423,6 @@ const ChatArea = ({
             </div>
           )}
 
-          {/* Emoji Button */}
           <button
             className="text-black mr-3"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -293,7 +430,6 @@ const ChatArea = ({
             <FaRegSmile />
           </button>
 
-          {/* Input */}
           <input
             type="text"
             className="flex-1 focus:outline-none bg-transparent"
@@ -303,7 +439,6 @@ const ChatArea = ({
             onKeyPress={handleKeyPress}
           />
 
-          {/* Mic / Send */}
           {newMessage.trim() === "" ? (
             <button className="text-black ml-3 hover:bg-green-600 hover:text-white py-2 px-2 rounded-full">
               <FaMicrophone className="text-lg" />
@@ -318,7 +453,6 @@ const ChatArea = ({
           )}
         </div>
 
-        {/* Emoji Picker */}
         {showEmojiPicker && (
           <div
             ref={emojiPickerRef}
