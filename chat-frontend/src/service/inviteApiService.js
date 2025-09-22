@@ -17,8 +17,9 @@ api.interceptors.request.use((config) => {
 });
 
 // 1. Send Invite (only receiverEmail needed)
-export const sendInvite = async (receiverEmail) => {
-  const { data } = await api.post("/send", { receiverEmail });
+export const sendInvite = async (email) => {
+  if (!email) throw new Error("Email is required");
+  const { data } = await api.post(`${API}/send`, { email });
   return data;
 };
 
@@ -31,12 +32,12 @@ export const getReceivedInvites = async (userId) => {
 
 // 3. Accept Invite
 export const acceptInvite = async (inviteId) => {
-  const { data } = await api.put(`/accept/${inviteId}`);
+  const { data } = await api.post(`/accept/${inviteId}`);
   return data;
 };
 
 // 4. Reject Invite
 export const rejectInvite = async (inviteId) => {
-  const { data } = await api.put(`/reject/${inviteId}`);
+  const { data } = await api.post(`/reject/${inviteId}`);
   return data;
 };

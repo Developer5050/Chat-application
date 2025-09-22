@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, memo } from "react";
 import { IoMdSearch } from "react-icons/io";
 import { IoArrowBack } from "react-icons/io5";
-import { FaTimes, FaPencilAlt } from "react-icons/fa";
+import { FaTimes, FaPencilAlt, FaEllipsisV } from "react-icons/fa";
 import { MdOutlineGroupAdd, MdLogout } from "react-icons/md";
 import Logo from "../../assets/logo2.jpeg";
 import ChatList from "../chatList/ChatList";
@@ -26,25 +26,33 @@ const SidebarRight = ({
   activeView,
   setActiveView,
 }) => {
+  // 🔹 Profile State
   const [name, setName] = useState("Ahmad Shoukat");
   const [about, setAbout] = useState("Available");
   const [phone, setPhone] = useState("+92 300 1234567");
 
+  // 🔹 Invite State
   const [receiverEmail, setReceiverEmail] = useState("");
   const [requests, setRequests] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { logout } = useLogout();
-  const userId = localStorage.getItem("userId");
+  const userId = useMemo(() => localStorage.getItem("userId"), []);
 
   useEffect(() => {
     if (activeView === "invite") fetchRequests();
   }, [activeView]);
 
+  const currentUser = JSON.parse(localStorage.getItem("user"));
+  const currentUserId = currentUser?._id || currentUser?.id;
+
   const fetchRequests = async () => {
     try {
       const res = await getReceivedInvites(userId);
-      setRequests(res);
+      const validRequests = res.filter(
+        (invite) => invite.sender && invite.receiver
+      );
+      setRequests(validRequests);
     } catch (err) {
       console.error(err);
     }
@@ -55,6 +63,7 @@ const SidebarRight = ({
     try {
       await sendInvite(receiverEmail);
       setReceiverEmail("");
+      setIsModalOpen(false);
       fetchRequests();
       alert("Invite sent!");
     } catch (err) {
@@ -64,26 +73,118 @@ const SidebarRight = ({
 
   const handleAccept = async (inviteId) => {
     try {
-      await acceptInvite(inviteId); // Backend marks as accepted & removes invite
-      fetchRequests(); // Refresh invite modal
-      // Optionally refresh chat list if you have a fetchChats() or update state
+      const data = await acceptInvite(inviteId);
+
+      // Remove invite from list
+      setRequests((prev) => prev.filter((req) => req._id !== inviteId));
+
+      // ✅ Use full user objects from backend
+      const newChat = {
+        _id: data.chatId,
+        participants: [
+          { _id: data.sender._id, name: data.sender.name },
+          { _id: data.receiver._id, name: data.receiver.name },
+        ],
+        messages: [],
+      };
+
+      // Add to active chats
+      setActiveChat((prev) => [...prev, newChat]);
+
+      alert("Invite accepted! Chat created.");
     } catch (err) {
-      console.error(err);
+      console.error("Error accepting invite:", err);
+      alert(err.response?.data?.message || "Error accepting invite");
     }
   };
 
   const handleReject = async (inviteId) => {
     try {
-      await rejectInvite(inviteId); // Backend removes invite
-      fetchRequests(); // Refresh invite modal
+      await rejectInvite(inviteId);
+
+      setRequests((prev) => prev.filter((req) => req._id !== inviteId));
+
+      alert("Invite rejected!");
     } catch (err) {
-      console.error(err);
+      console.error("Error rejecting invite:", err);
+      alert(err.response?.data?.message || "Error rejecting invite");
     }
   };
 
+  const getDisplayEmail = (invite) => {
+    if (!invite.sender || !invite.receiver) return "";
+    // const isReceiver = invite.receiver._id?.toString() === userId;
+    const isSender = invite.sender._id?.toString() === userId;
+    return isSender ? invite.receiver.email : invite.sender.email;
+  };
+
+  const getStatusText = (invite) => {
+    const isSender = invite.sender._id?.toString() === userId;
+    return isSender ? "Pending" : invite.status;
+  };
+
+  // 🔹 JSX for Profile Inputs
+  const renderProfileInput = (label, value, setValue) => (
+    <div className="px-6 mt-6 w-full">
+      <label className="text-sm text-gray-500">{label}</label>
+      <div className="flex items-center border-b py-2">
+        <input
+          type="text"
+          className="flex-1 outline-none text-gray-800"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <FaPencilAlt className="text-gray-500 cursor-pointer ml-2" />
+      </div>
+    </div>
+  );
+
+  // 🔹 Invite List JSX
+  const renderInviteList = () => (
+    <div className="flex flex-col space-y-2 max-h-80 overflow-y-auto mt-2">
+      {requests.length === 0 ? (
+        <p className="text-gray-500 text-sm">No pending requests</p>
+      ) : (
+        requests.map((invite) => {
+          const isReceiver = invite.receiver._id?.toString() === userId;
+          return (
+            <div
+              key={invite._id}
+              className="flex justify-between items-center border p-2 rounded-md"
+            >
+              <span className="text-sm">
+                {getDisplayEmail(invite)}{" "}
+                {invite.sender._id?.toString() === userId && (
+                  <span className="text-gray-400 text-xs ml-2">
+                    ({getStatusText(invite)})
+                  </span>
+                )}
+              </span>
+              {isReceiver && (
+                <div className="flex space-x-2">
+                  <button
+                    className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs"
+                    onClick={() => handleAccept(invite._id)}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 text-xs"
+                    onClick={() => handleReject(invite._id)}
+                  >
+                    Reject
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+
   return (
     <div className="w-1/3 bg-white flex flex-col border-r custom-width">
-      {/* 🔹 Profile View */}
       {activeView === "profile" ? (
         <>
           <div className="flex items-center px-4 py-3">
@@ -103,47 +204,11 @@ const SidebarRight = ({
             <p className="text-sm text-gray-500 mt-2">Tap to change photo</p>
           </div>
 
-          <div className="px-6 mt-10 w-full">
-            <label className="text-sm text-gray-500">Name</label>
-            <div className="flex items-center border-b py-2">
-              <input
-                type="text"
-                className="flex-1 outline-none text-gray-800"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <FaPencilAlt className="text-gray-500 cursor-pointer ml-2" />
-            </div>
-          </div>
-
-          <div className="px-6 mt-6 w-full">
-            <label className="text-sm text-gray-500">About</label>
-            <div className="flex items-center border-b py-2">
-              <input
-                type="text"
-                className="flex-1 outline-none text-gray-800"
-                value={about}
-                onChange={(e) => setAbout(e.target.value)}
-              />
-              <FaPencilAlt className="text-gray-500 cursor-pointer ml-2" />
-            </div>
-          </div>
-
-          <div className="px-6 mt-6 w-full">
-            <label className="text-sm text-gray-500">Phone</label>
-            <div className="flex items-center border-b py-2">
-              <input
-                type="text"
-                className="flex-1 outline-none text-gray-800"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-              <FaPencilAlt className="text-gray-500 cursor-pointer ml-2" />
-            </div>
-          </div>
+          {renderProfileInput("Name", name, setName)}
+          {renderProfileInput("About", about, setAbout)}
+          {renderProfileInput("Phone", phone, setPhone)}
         </>
       ) : activeView === "invite" ? (
-        // 🔹 Invite View
         <div className="p-4 flex flex-col">
           {/* Header */}
           <div className="flex justify-between items-center h-16">
@@ -158,98 +223,75 @@ const SidebarRight = ({
             </div>
             <button
               className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700"
-              onClick={handleSendInvite}
+              onClick={() => setIsModalOpen(true)}
             >
               Invite
             </button>
           </div>
 
-          {/* Search + Send */}
-          <div className="relative p-5">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <IoMdSearch className="text-gray-500 ml-5" />
+          {/* Search Input */}
+          <div className="relative mt-2.5 mb-7">
+            <div className="absolute inset-y-0 left-0 flex items-center pointer-events-none">
+              <IoMdSearch className="mt-0.5 ml-3" />
             </div>
             <input
-              type="email"
-              placeholder="Enter user email to invite"
-              className="bg-white text-sm w-full pl-9 pr-3 py-2 rounded-full border border-transparent hover:border-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              value={receiverEmail}
-              onChange={(e) => setReceiverEmail(e.target.value)}
+              type="text"
+              className="bg-white text-sm w-full pl-9 pr-2 py-2 rounded-full border border-gray-300 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              placeholder="Search requests"
             />
           </div>
 
-          {/* Request Button */}
-          <button
-            className="bg-gray-100 text-gray-700 px-3 py-1 rounded-md hover:bg-gray-200 w-fit mt-3"
-            onClick={() => setIsModalOpen(true)}
-          >
-            Requests ({requests.length})
-          </button>
+          {/* Requests Badge */}
+          <div className="mb-3">
+            <span className="bg-gray-200 px-3 py-1 rounded-full text-gray-700 text-sm">
+              Requests ({requests.length})
+            </span>
+          </div>
 
-          {/* Requests Modal */}
+          {renderInviteList()}
+
+          {/* Modal for Sending Invite */}
           {isModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-50">
-              <div className="bg-white w-96 rounded-xl p-4 relative">
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+              <div className="bg-white w-96 rounded-xl p-6 relative shadow-lg">
                 <button
-                  className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+                  className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
                   onClick={() => setIsModalOpen(false)}
                 >
-                  <FaTimes />
+                  <FaTimes size={18} />
                 </button>
-                <h3 className="text-lg font-semibold mb-3">Pending Requests</h3>
-
-                {requests.length === 0 && <p>No pending requests</p>}
-
-                <div className="flex flex-col space-y-2 max-h-64 overflow-y-auto">
-                  {requests.map((invite) => {
-                    const isReceiver =
-                      invite.receiver?._id?.toString() === userId;
-                      
-                    const displayEmail =
-                      invite.sender?._id?.toString() === userId
-                        ? invite.receiver?.email
-                        : invite.sender?.email;
-
-                    return (
-                      <div
-                        key={invite._id}
-                        className="flex justify-between items-center border p-2 rounded-md"
-                      >
-                        <span>{displayEmail}</span>
-                        {isReceiver && (
-                          <div className="flex space-x-2">
-                            <button
-                              className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-sm"
-                              onClick={() => handleAccept(invite._id)}
-                            >
-                              Accept
-                            </button>
-                            <button
-                              className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 text-sm"
-                              onClick={() => handleReject(invite._id)}
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <h3 className="text-lg font-semibold mb-4">Invite Users</h3>
+                <div className="flex mb-4">
+                  <input
+                    type="email"
+                    placeholder="Enter user email"
+                    className="flex-1 border border-gray-300 rounded-l-md px-3 py-2 outline-none focus:ring-1 focus:ring-green-500"
+                    value={receiverEmail}
+                    onChange={(e) => setReceiverEmail(e.target.value)}
+                  />
+                  <button
+                    className="bg-green-600 text-white px-4 py-2 rounded-r-md hover:bg-green-700"
+                    onClick={handleSendInvite}
+                  >
+                    Send
+                  </button>
                 </div>
               </div>
             </div>
           )}
         </div>
       ) : (
-        // 🔹 Normal Chat Sidebar View
         <>
+          {/* Normal Chat Sidebar */}
           <div className="p-3 flex justify-between items-center h-16">
             <img src={Logo} alt="Logo" width={50} height={50} />
             <div className="relative">
               <button
                 className="text-black mt-1"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              ></button>
+              >
+                <FaEllipsisV />
+              </button>
               {isDropdownOpen && (
                 <div className="absolute -right-6 mt-2 w-44 bg-white rounded-lg shadow-lg py-1 z-10">
                   <div className="px-2">
@@ -312,9 +354,10 @@ const SidebarRight = ({
 
           {/* Chat List */}
           <ChatList
-            filteredChats={filteredChats}
+            filteredChats={activeChat}
             activeChat={activeChat}
             setActiveChat={setActiveChat}
+            currentUserId={currentUserId}
           />
         </>
       )}
@@ -322,4 +365,4 @@ const SidebarRight = ({
   );
 };
 
-export default SidebarRight;
+export default memo(SidebarRight);

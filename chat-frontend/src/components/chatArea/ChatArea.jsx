@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   MdLocalPhone,
   MdFavoriteBorder,
@@ -7,7 +13,7 @@ import {
 } from "react-icons/md";
 import { FcInvite } from "react-icons/fc";
 import { FaEllipsisVertical, FaPlus, FaMicrophone } from "react-icons/fa6";
-import { FaPoll, FaRegSmile, FaTimes } from "react-icons/fa";
+import { FaPoll, FaTimes, FaRegSmile } from "react-icons/fa";
 import {
   IoSend,
   IoCloseCircleOutline,
@@ -44,21 +50,35 @@ const ChatArea = ({
   userId,
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const emojiPickerRef = useRef(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [openPlus, setOpenPlus] = useState(false);
 
-  // --- Video/Audio Call States ---
+  // Video/Audio Call States
   const [stream, setStream] = useState(null);
   const [call, setCall] = useState({});
   const [callAccepted, setCallAccepted] = useState(false);
   const myVideo = useRef(null);
   const userVideo = useRef(null);
   const connectionRef = useRef();
+  const emojiPickerRef = useRef(null);
 
-  const onEmojiClick = (emojiObject) => {
-    setNewMessage((prev) => prev + emojiObject.emoji);
-  };
+  // Memoized Active Chat Data
+  const activeChatData = useMemo(
+    () => chats.find((c) => c.id === activeChat) || {},
+    [chats, activeChat]
+  );
+  const receiverId = useMemo(
+    () => activeChatData.userId || null,
+    [activeChatData]
+  );
+
+  // Emoji Picker
+  const onEmojiClick = useCallback(
+    (emojiObject) => {
+      setNewMessage((prev) => prev + emojiObject.emoji);
+    },
+    [setNewMessage]
+  );
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -73,32 +93,27 @@ const ChatArea = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleOpen = () => setIsOpen(!isOpen);
-
+  // Media & Socket Setup
   useEffect(() => {
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: true })
       .then((currentStream) => {
         setStream(currentStream);
         if (myVideo.current) myVideo.current.srcObject = currentStream;
-      });
+      })
+      .catch(console.error);
 
-    if (!userId) {
-      console.error("⚠️ userId missing, call feature won't work");
-      return;
-    }
+    if (!userId)
+      return console.error("⚠️ userId missing, call feature won't work");
 
     socket.emit("join", userId);
 
-    socket.on("call-made", ({ from, signal }) => {
-      setCall({ isReceivingCall: true, from, signal });
-    });
-
+    socket.on("call-made", ({ from, signal }) =>
+      setCall({ isReceivingCall: true, from, signal })
+    );
     socket.on("call-accepted", (signal) => {
       setCallAccepted(true);
-      if (connectionRef.current) {
-        connectionRef.current.signal(signal);
-      }
+      connectionRef.current?.signal(signal);
     });
 
     return () => {
@@ -107,70 +122,61 @@ const ChatArea = ({
     };
   }, [userId]);
 
-  // Caller function
-  const callUser = (id) => {
-     console.log("📞 Calling user:", id);
-    if (!id) return;
-    const peer = new Peer({ initiator: true, trickle: false, stream });
+  // Call Functions
+  const callUser = useCallback(
+    (id) => {
+      if (!id) return;
+      const peer = new Peer({ initiator: true, trickle: false, stream });
 
-    peer.on("signal", (data) => {
-      socket.emit("call-user", {
-        userToCall: id,
-        signalData: data,
-        from: userId,
+      peer.on("signal", (data) =>
+        socket.emit("call-user", {
+          userToCall: id,
+          signalData: data,
+          from: userId,
+        })
+      );
+      peer.on("stream", (currentStream) => {
+        if (userVideo.current) userVideo.current.srcObject = currentStream;
       });
-    });
 
-    peer.on("stream", (currentStream) => {
-      if (userVideo.current) userVideo.current.srcObject = currentStream;
-    });
+      connectionRef.current = peer;
+    },
+    [stream, userId]
+  );
 
-    connectionRef.current = peer;
-  };
-
-  // Receiver function
-  const answerCall = () => {
+  const answerCall = useCallback(() => {
     if (!call.from) return;
 
     setCallAccepted(true);
     const peer = new Peer({ initiator: false, trickle: false, stream });
 
-    peer.on("signal", (data) => {
-      socket.emit("answer-call", {
-        to: call.from,
-        signal: data,
-      });
-    });
-
+    peer.on("signal", (data) =>
+      socket.emit("answer-call", { to: call.from, signal: data })
+    );
     peer.on("stream", (currentStream) => {
       if (userVideo.current) userVideo.current.srcObject = currentStream;
     });
 
     peer.signal(call.signal);
     connectionRef.current = peer;
-  };
-
-  // Safe receiverId
-  const receiverId = chats.find((c) => c.id === activeChat)?.userId || null;
+  }, [call, stream]);
 
   // --- Render special views ---
-  if (activeView === "invite") {
+  if (activeView === "invite")
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
-        <FcInvite className="text-5xl text-gray-500 mb-2 mr-2" />
+        <FcInvite className="text-5xl text-gray-500 mb-2" />
         <h2 className="text-2xl font-medium text-gray-700">Invite</h2>
       </div>
     );
-  }
 
-  if (activeView === "profile") {
+  if (activeView === "profile")
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
-        <IoPerson className="text-5xl text-gray-500 mb-3 mr-2" />
+        <IoPerson className="text-5xl text-gray-500 mb-3" />
         <h2 className="text-2xl font-medium text-gray-700">Profile</h2>
       </div>
     );
-  }
 
   // --- Main Chat Area ---
   return (
@@ -181,32 +187,25 @@ const ChatArea = ({
           <img
             className="h-12 w-12 rounded-full"
             src={`https://ui-avatars.com/api/?name=${
-              chats.find((chat) => chat.id === activeChat)?.name
+              activeChatData.name || ""
             }&background=random`}
-            alt={chats.find((chat) => chat.id === activeChat)?.name}
+            alt={activeChatData.name || "User"}
           />
           <div className="ml-2">
-            <h3 className="font-semibold">
-              {chats.find((chat) => chat.id === activeChat)?.name}
-            </h3>
+            <h3 className="font-semibold">{activeChatData.name}</h3>
             <p className="text-xs text-gray-600">
-              {chats.find((chat) => chat.id === activeChat)?.online
-                ? "Online"
-                : "Offline"}
+              {activeChatData.online ? "Online" : "Offline"}
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2 text-black text-xl">
-          {/* Video Call Button */}
           <button
             className="w-10 h-10 flex items-center justify-center"
             onClick={() => receiverId && callUser(receiverId)}
           >
             <PiVideoCameraFill />
           </button>
-
-          {/* Audio Call Button */}
           <button
             className="w-10 h-10 flex items-center justify-center"
             onClick={() => receiverId && callUser(receiverId)}
@@ -214,88 +213,47 @@ const ChatArea = ({
             <MdLocalPhone />
           </button>
 
-          {/* Dropdown Button */}
+
+          {/* Dropdown */}
           <div className="relative">
             <button
               className="w-10 h-10 flex items-center justify-center"
-              onClick={toggleOpen}
+              onClick={() => setIsDropdownOpen((prev) => !prev)}
             >
               <FaEllipsisVertical />
             </button>
-
-            {isOpen && (
-              <div className="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-2xl py-1 z-10">
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
-                    <IoMdInformationCircleOutline className="text-lg" />
-                    <span className="ml-3">Contact Info</span>
-                  </button>
-                </div>
-
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
-                    <BiMessageSquareCheck className="text-lg" />
-                    <span className="ml-3">Select messages</span>
-                  </button>
-                </div>
-
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
-                    <BsMicMute className="text-lg" />
-                    <span className="ml-3">Mute notifications</span>
-                  </button>
-                </div>
-
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
-                    <SlSpeedometer className="text-md" />
-                    <span className="ml-3">Disappearing messages</span>
-                  </button>
-                </div>
-
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
-                    <MdFavoriteBorder className="text-lg" />
-                    <span className="ml-3">Add to favourites</span>
-                  </button>
-                </div>
-
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
-                    <IoCloseCircleOutline className="text-lg" />
-                    <span className="ml-3">Close chat</span>
-                  </button>
-                </div>
-
-                <hr className="h-2 w-48 ml-4 text-gray-300 mt-3" />
-
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-700 w-full rounded-md">
-                    <LuThumbsDown className="text-lg" />
-                    <span className="ml-3">Report</span>
-                  </button>
-                </div>
-
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-700 w-full rounded-md">
-                    <MdBlockFlipped className="text-lg" />
-                    <span className="ml-3">Block</span>
-                  </button>
-                </div>
-
-                <div className="px-2">
-                  <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-700 w-full rounded-md">
-                    <IoIosRemoveCircleOutline className="text-lg" />
-                    <span className="ml-3">Clear chat</span>
-                  </button>
-                </div>
-
-                <div className="px-2">
-                  <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-700 rounded-md">
-                    <RiDeleteBin6Line className="text-lg" />
-                    <span className="ml-3">Delete Chat</span>
-                  </button>
-                </div>
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-1 w-60 bg-white rounded-xl shadow-2xl py-1 z-10">
+                {/* Dropdown Items */}
+                {[
+                  { icon: IoMdInformationCircleOutline, label: "Contact Info" },
+                  { icon: BiMessageSquareCheck, label: "Select messages" },
+                  { icon: BsMicMute, label: "Mute notifications" },
+                  { icon: SlSpeedometer, label: "Disappearing messages" },
+                  { icon: MdFavoriteBorder, label: "Add to favourites" },
+                  { icon: IoCloseCircleOutline, label: "Close chat" },
+                  { icon: LuThumbsDown, label: "Report", red: true },
+                  { icon: MdBlockFlipped, label: "Block", red: true },
+                  {
+                    icon: IoIosRemoveCircleOutline,
+                    label: "Clear chat",
+                    red: true,
+                  },
+                  { icon: RiDeleteBin6Line, label: "Delete Chat", red: true },
+                ].map((item, idx) => (
+                  <div key={idx} className="px-2">
+                    <button
+                      className={`flex items-center px-4 py-2 text-sm w-full rounded-md ${
+                        item.red
+                          ? "text-red-700 hover:bg-red-100"
+                          : "text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      <item.icon className="text-lg" />
+                      <span className="ml-3">{item.label}</span>
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -313,7 +271,6 @@ const ChatArea = ({
             style={{ width: "200px", borderRadius: "10px" }}
           />
         )}
-
         {callAccepted && (
           <video
             playsInline
@@ -322,8 +279,6 @@ const ChatArea = ({
             style={{ width: "200px", borderRadius: "10px" }}
           />
         )}
-
-        {/* Incoming Call UI */}
         {call.isReceivingCall && !callAccepted && (
           <div className="flex flex-col items-start bg-white shadow-md rounded-lg p-3">
             <p className="text-sm font-medium mb-2 text-gray-700">
@@ -377,12 +332,12 @@ const ChatArea = ({
         </div>
       </div>
 
-      {/* Input */}
+      {/* Input Area */}
       <div className="p-3 flex items-center bg-white relative">
         <div className="flex-1 flex items-center rounded-full px-3 py-2 shadow-sm border border-gray-300 bg-white relative">
           <button
             type="button"
-            onClick={() => setOpenPlus(!openPlus)}
+            onClick={() => setOpenPlus((prev) => !prev)}
             className="text-black hover:text-gray-700 mr-3"
           >
             {openPlus ? <FaTimes size={18} /> : <FaPlus size={18} />}
@@ -390,42 +345,34 @@ const ChatArea = ({
 
           {openPlus && (
             <div className="absolute bottom-14 -left-10 bg-white border rounded-xl shadow-md w-48 p-1">
-              <div className="px-2">
-                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
-                  <IoDocumentText className="text-lg text-purple-500" />
-                  <span className="ml-3">Document</span>
-                </button>
-              </div>
-              <div className="px-2">
-                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
-                  <IoMdPhotos className="text-lg text-blue-500" />
-                  <span className="ml-3">Photos & videos</span>
-                </button>
-              </div>
-              <div className="px-2">
-                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
-                  <IoPerson className="text-lg text-cyan-500" />
-                  <span className="ml-3">Contact</span>
-                </button>
-              </div>
-              <div className="px-2">
-                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
-                  <FaPoll className="text-lg text-yellow-500" />
-                  <span className="ml-3">Poll</span>
-                </button>
-              </div>
-              <div className="px-2">
-                <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
-                  <MdEvent className="text-lg text-pink-500" />
-                  <span className="ml-3">Event</span>
-                </button>
-              </div>
+              {[
+                {
+                  icon: IoDocumentText,
+                  label: "Document",
+                  color: "text-purple-500",
+                },
+                {
+                  icon: IoMdPhotos,
+                  label: "Photos & videos",
+                  color: "text-blue-500",
+                },
+                { icon: IoPerson, label: "Contact", color: "text-cyan-500" },
+                { icon: FaPoll, label: "Poll", color: "text-yellow-500" },
+                { icon: MdEvent, label: "Event", color: "text-pink-500" },
+              ].map((item, idx) => (
+                <div key={idx} className="px-2">
+                  <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
+                    <item.icon className={`text-lg ${item.color}`} />
+                    <span className="ml-3">{item.label}</span>
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
           <button
             className="text-black mr-3"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            onClick={() => setShowEmojiPicker((prev) => !prev)}
           >
             <FaRegSmile />
           </button>

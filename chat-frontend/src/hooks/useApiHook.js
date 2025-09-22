@@ -12,7 +12,7 @@ const useApiHook = () => {
     setError("");
     setData(null);
 
-     try {
+    try {
       const response = await axios({
         url,
         method,

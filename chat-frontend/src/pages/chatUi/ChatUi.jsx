@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import SidebarLeft from "../../components/sidebarLeft/SidebarLeft";
 import SidebarRight from "../../components/sidebarRight/SidebarRight";
 import ChatArea from "../../components/chatArea/ChatArea";
 
 const ChatUi = () => {
+  // Dummy Chats (replace with API later)
   const [chats] = useState([
     {
       id: 1,
@@ -32,44 +33,9 @@ const ChatUi = () => {
       online: false,
       type: "group",
     },
-    {
-      id: 4,
-      name: "John Doe",
-      lastMessage: "Hey, how are you?",
-      time: "10:30 AM",
-      unread: 3,
-      online: true,
-      type: "personal",
-    },
-    {
-      id: 5,
-      name: "Jane Smith",
-      lastMessage: "See you tomorrow!",
-      time: "9:15 AM",
-      unread: 0,
-      online: true,
-      type: "personal",
-    },
-    {
-      id: 6,
-      name: "John Doe",
-      lastMessage: "Hey, how are you?",
-      time: "10:30 AM",
-      unread: 3,
-      online: true,
-      type: "personal",
-    },
-    {
-      id: 7,
-      name: "Jane Smith",
-      lastMessage: "See you tomorrow!",
-      time: "9:15 AM",
-      unread: 0,
-      online: true,
-      type: "personal",
-    },
   ]);
 
+  // Dummy Messages (replace with API later)
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -87,7 +53,7 @@ const ChatUi = () => {
     },
   ]);
 
-  const [activeChat, setActiveChat] = useState(null);
+  const [activeChat, setActiveChat] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchPlaceholder, setSearchPlaceholder] = useState(
@@ -96,48 +62,64 @@ const ChatUi = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeView, setActiveView] = useState("chats");
 
-  const filteredChats = chats.filter((chat) => {
-    if (activeFilter === "all") return true;
-    if (activeFilter === "unread") return chat.unread > 0;
-    if (activeFilter === "group") return chat.type === "group";
-    return true;
-  });
+  // ✅ Memoized filtered chats
+  const filteredChats = useMemo(() => {
+    switch (activeFilter) {
+      case "unread":
+        return chats.filter((chat) => chat.unread > 0);
+      case "group":
+        return chats.filter((chat) => chat.type === "group");
+      default:
+        return chats;
+    }
+  }, [activeFilter, chats]);
 
+  // ✅ Auto-select first available chat
   useEffect(() => {
-    if (filteredChats.length > 0 && activeChat === null) {
-      setActiveChat(filteredChats[0].id);
+    if (filteredChats.length > 0 && !activeChat) {
+      setActiveChat(filteredChats[0]); // object
     }
   }, [filteredChats, activeChat]);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() === "") return;
+  // ✅ Optimized send message
+  const handleSendMessage = useCallback(() => {
+    if (!newMessage.trim()) return;
     const newMsg = {
-      id: messages.length + 1,
+      id: Date.now(),
       text: newMessage,
       sender: "me",
       time: new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       }),
+      status: "sent",
     };
-    setMessages([...messages, newMsg]);
+    setMessages((prev) => [...prev, newMsg]);
     setNewMessage("");
-  };
+  }, [newMessage]);
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") handleSendMessage();
-  };
+  // ✅ Optimized keypress
+  const handleKeyPress = useCallback(
+    (e) => {
+      if (e.key === "Enter") handleSendMessage();
+    },
+    [handleSendMessage]
+  );
 
+  // ✅ Get logged in user
   const currentUser = JSON.parse(localStorage.getItem("user"));
 
   return (
     <div className="flex h-screen bg-gray-100 font-ubuntu">
+      {/* Left Sidebar */}
       <SidebarLeft setActiveView={setActiveView} />
+
+      {/* Right Sidebar */}
       <SidebarRight
         isDropdownOpen={isDropdownOpen}
         setIsDropdownOpen={setIsDropdownOpen}
         filteredChats={filteredChats}
-        activeChat={activeChat}
+        activeChat={activeChat ? [activeChat] : []} 
         setActiveChat={setActiveChat}
         activeFilter={activeFilter}
         setActiveFilter={setActiveFilter}
@@ -146,6 +128,8 @@ const ChatUi = () => {
         activeView={activeView}
         setActiveView={setActiveView}
       />
+
+      {/* Chat Area */}
       <ChatArea
         chats={chats}
         activeChat={activeChat}
@@ -155,7 +139,7 @@ const ChatUi = () => {
         handleSendMessage={handleSendMessage}
         handleKeyPress={handleKeyPress}
         activeView={activeView}
-        userId={currentUser?.id} // ✅ yahan "id" use karna hai
+        userId={currentUser?.id}
       />
     </div>
   );
