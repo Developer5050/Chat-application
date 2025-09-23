@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
 import { IoMdSearch } from "react-icons/io";
+import SidebarLeft from "../sidebarLeft/SidebarLeft";
 import { IoArrowBack } from "react-icons/io5";
 import { FaTimes, FaPencilAlt, FaEllipsisV } from "react-icons/fa";
 import { MdOutlineGroupAdd, MdLogout } from "react-icons/md";
@@ -11,7 +12,9 @@ import {
   getReceivedInvites,
   acceptInvite,
   rejectInvite,
+  cancelInvite,
 } from "../../service/inviteApiService";
+// import { getOrCreateDirectChat, getChats } from "../../service/chatApiService";
 
 const SidebarRight = ({
   isDropdownOpen,
@@ -25,6 +28,9 @@ const SidebarRight = ({
   setSearchPlaceholder,
   activeView,
   setActiveView,
+  onNewChat,
+  fetchChats,
+  chats,
 }) => {
   // 🔹 Profile State
   const [name, setName] = useState("Ahmad Shoukat");
@@ -33,94 +39,181 @@ const SidebarRight = ({
 
   // 🔹 Invite State
   const [receiverEmail, setReceiverEmail] = useState("");
-  const [requests, setRequests] = useState([]);
+  const [invites, setInvites] = useState({
+    receivedInvites: [],
+    sentInvites: [],
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const { logout } = useLogout();
-  const userId = useMemo(() => localStorage.getItem("userId"), []);
-
-  useEffect(() => {
-    if (activeView === "invite") fetchRequests();
-  }, [activeView]);
-
   const currentUser = JSON.parse(localStorage.getItem("user"));
   const currentUserId = currentUser?._id || currentUser?.id;
 
-  const fetchRequests = async () => {
+  useEffect(() => {
+    if (activeView === "invite") {
+      fetchInvites();
+    }
+  }, [activeView]);
+
+  const fetchInvites = async () => {
     try {
-      const res = await getReceivedInvites(userId);
-      const validRequests = res.filter(
-        (invite) => invite.sender && invite.receiver
-      );
-      setRequests(validRequests);
+      setLoading(true);
+      const res = await getReceivedInvites();
+      setInvites(res);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching invites:", err);
+      alert(err.response?.data?.message || "Error fetching invites");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSendInvite = async () => {
-    if (!receiverEmail) return;
+    if (!receiverEmail) {
+      alert("Please enter an email address");
+      return;
+    }
+
     try {
+      setLoading(true);
       await sendInvite(receiverEmail);
       setReceiverEmail("");
       setIsModalOpen(false);
-      fetchRequests();
-      alert("Invite sent!");
+      await fetchInvites(); // Refresh the invites list
+      alert("Invite sent successfully!");
     } catch (err) {
+      console.error("Error sending invite:", err);
       alert(err.response?.data?.message || "Error sending invite");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAccept = async (inviteId) => {
+  // 🔹 Chat Open Handler
+  const handleChatOpen = async (user) => {
     try {
-      const data = await acceptInvite(inviteId);
+      if (user._id === currentUserId) {
+        console.warn("⚠️ Cannot start chat with yourself");
+        return;
+      }
 
-      // Remove invite from list
-      setRequests((prev) => prev.filter((req) => req._id !== inviteId));
+      // Use the POST endpoint, not GET
+      const res = await createOrGetChat(user._id);
+      console.log("Chat creation response:", res);
 
-      // ✅ Use full user objects from backend
       const newChat = {
-        _id: data.chatId,
-        participants: [
-          { _id: data.sender._id, name: data.sender.name },
-          { _id: data.receiver._id, name: data.receiver.name },
-        ],
-        messages: [],
+        _id: res.chat._id,
+        participants: res.chat.participants,
+        messages: res.chat.messages || [],
+        type: res.chat.type || "direct",
       };
 
-      // Add to active chats
-      setActiveChat((prev) => [...prev, newChat]);
+      // Update the active chat
+      setActiveChat(newChat);
 
-      alert("Invite accepted! Chat created.");
+      // Refresh the chats list
+      if (fetchChats) {
+        await fetchChats();
+      }
+
+      console.log("✅ Chat opened with:", user.username);
     } catch (err) {
-      console.error("Error accepting invite:", err);
-      alert(err.response?.data?.message || "Error accepting invite");
+      console.error("❌ Error opening chat:", err);
+      console.error("❌ Error details:", err.response?.data || err.message);
+
+      if (err.response?.status === 404) {
+        alert("Chat endpoint not found. Please check backend routes.");
+      } else {
+        alert(err.response?.data?.message || "Error opening chat");
+      }
     }
   };
 
+  const handleAccept = async (inviteId, sender) => {
+    try {
+      console.log("Accepting invite:", inviteId);
+      setLoading(true);
+      const res = await acceptInvite(inviteId);
+      console.log("Invite accepted response:", res);
+
+      // Remove the accepted invite from the list
+      setInvites((prev) => ({
+        ...prev,
+        receivedInvites: prev.receivedInvites.filter(
+          (invite) => invite._id !== inviteId
+        ),
+      }));
+
+      // Refresh the chats list
+      if (fetchChats) {
+        await fetchChats(); // Wait for chats to be fetched
+      }
+
+      // If it's a one-on-one invite, find and set the active chat
+      if (res.inviteType === "one-on-one" && res.chat) {
+        // Use the onNewChat callback if provided
+        if (onNewChat) {
+          onNewChat(res.chat);
+        } else {
+          // Fallback: manually add to active chat
+          setActiveChat((prev) => {
+            const exists = prev.some((chat) => chat._id === res.chat._id);
+            return exists ? prev : [...prev, res.chat];
+          });
+        }
+      }
+
+      alert("Invite accepted successfully! Chat created.");
+    } catch (error) {
+      console.error("Error accepting invite:", error);
+      alert(error.response?.data?.message || "Error accepting invite");
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleReject = async (inviteId) => {
     try {
+      setLoading(true);
       await rejectInvite(inviteId);
 
-      setRequests((prev) => prev.filter((req) => req._id !== inviteId));
+      // Remove the rejected invite from the list
+      setInvites((prev) => ({
+        ...prev,
+        receivedInvites: prev.receivedInvites.filter(
+          (invite) => invite._id !== inviteId
+        ),
+      }));
 
       alert("Invite rejected!");
     } catch (err) {
       console.error("Error rejecting invite:", err);
       alert(err.response?.data?.message || "Error rejecting invite");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getDisplayEmail = (invite) => {
-    if (!invite.sender || !invite.receiver) return "";
-    // const isReceiver = invite.receiver._id?.toString() === userId;
-    const isSender = invite.sender._id?.toString() === userId;
-    return isSender ? invite.receiver.email : invite.sender.email;
-  };
+  const handleCancel = async (inviteId) => {
+    try {
+      setLoading(true);
+      await cancelInvite(inviteId);
 
-  const getStatusText = (invite) => {
-    const isSender = invite.sender._id?.toString() === userId;
-    return isSender ? "Pending" : invite.status;
+      // Remove the cancelled invite from the list
+      setInvites((prev) => ({
+        ...prev,
+        sentInvites: prev.sentInvites.filter(
+          (invite) => invite._id !== inviteId
+        ),
+      }));
+
+      alert("Invite cancelled!");
+    } catch (err) {
+      console.error("Error cancelling invite:", err);
+      alert(err.response?.data?.message || "Error cancelling invite");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 🔹 JSX for Profile Inputs
@@ -141,45 +234,91 @@ const SidebarRight = ({
 
   // 🔹 Invite List JSX
   const renderInviteList = () => (
-    <div className="flex flex-col space-y-2 max-h-80 overflow-y-auto mt-2">
-      {requests.length === 0 ? (
-        <p className="text-gray-500 text-sm">No pending requests</p>
-      ) : (
-        requests.map((invite) => {
-          const isReceiver = invite.receiver._id?.toString() === userId;
-          return (
-            <div
-              key={invite._id}
-              className="flex justify-between items-center border p-2 rounded-md"
-            >
-              <span className="text-sm">
-                {getDisplayEmail(invite)}{" "}
-                {invite.sender._id?.toString() === userId && (
-                  <span className="text-gray-400 text-xs ml-2">
-                    ({getStatusText(invite)})
-                  </span>
-                )}
-              </span>
-              {isReceiver && (
+    <div className="space-y-4">
+      {/* Received Invites */}
+      <div>
+        <h3 className="text-md font-semibold mb-2">
+          Received Invites ({invites.receivedInvites?.length || 0})
+        </h3>
+        <div className="max-h-60 overflow-y-auto space-y-2">
+          {invites.receivedInvites?.length === 0 ? (
+            <p className="text-gray-500 text-sm">No pending invites</p>
+          ) : (
+            invites.receivedInvites?.map((invite) => (
+              <div
+                key={invite._id}
+                className="flex justify-between items-center border p-3 rounded-md bg-gray-50"
+              >
+                <div>
+                  <p className="font-medium">{invite.sender?.username}</p>
+                  <p className="text-sm text-gray-600">
+                    {invite.sender?.email}
+                  </p>
+                  {invite.chat && (
+                    <p className="text-xs text-gray-500">
+                      {invite.inviteType === "group"
+                        ? `Group: ${invite.chat.name}`
+                        : "One-on-One"}
+                    </p>
+                  )}
+                </div>
                 <div className="flex space-x-2">
                   <button
-                    className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs"
-                    onClick={() => handleAccept(invite._id)}
+                    disabled={loading}
+                    className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 text-xs disabled:opacity-50"
+                    onClick={() => handleAccept(invite._id, invite.sender)}
                   >
                     Accept
                   </button>
                   <button
-                    className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 text-xs"
+                    disabled={loading}
+                    className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 text-xs disabled:opacity-50"
                     onClick={() => handleReject(invite._id)}
                   >
                     Reject
                   </button>
                 </div>
-              )}
-            </div>
-          );
-        })
-      )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Sent Invites */}
+      <div>
+        <h3 className="text-md font-semibold mb-2">
+          Sent Invites ({invites.sentInvites?.length || 0})
+        </h3>
+        <div className="max-h-60 overflow-y-auto space-y-2">
+          {invites.sentInvites?.length === 0 ? (
+            <p className="text-gray-500 text-sm">No sent invites</p>
+          ) : (
+            invites.sentInvites?.map((invite) => (
+              <div
+                key={invite._id}
+                className="flex justify-between items-center border p-3 rounded-md bg-gray-50"
+              >
+                <div>
+                  <p className="font-medium">{invite.receiver?.username}</p>
+                  <p className="text-sm text-gray-600">
+                    {invite.receiver?.email}
+                  </p>
+                  <p className="text-xs text-gray-500 capitalize">
+                    {invite.status}
+                  </p>
+                </div>
+                <button
+                  disabled={loading}
+                  className="bg-gray-600 text-white px-3 py-1 rounded-md hover:bg-gray-700 text-xs disabled:opacity-50"
+                  onClick={() => handleCancel(invite._id)}
+                >
+                  Cancel
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 
@@ -188,6 +327,7 @@ const SidebarRight = ({
       {activeView === "profile" ? (
         <>
           <div className="flex items-center px-4 py-3">
+            
             <button
               onClick={() => setActiveView("chats")}
               className="mr-3 text-black py-2 px-2 rounded-full hover:bg-gray-200"
@@ -209,7 +349,7 @@ const SidebarRight = ({
           {renderProfileInput("Phone", phone, setPhone)}
         </>
       ) : activeView === "invite" ? (
-        <div className="p-4 flex flex-col">
+        <div className="p-4 flex flex-col h-full">
           {/* Header */}
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
@@ -219,36 +359,28 @@ const SidebarRight = ({
               >
                 <IoArrowBack size={22} />
               </button>
-              <h2 className="text-lg font-semibold">Invite</h2>
+              <h2 className="text-lg font-semibold">Invites</h2>
             </div>
             <button
-              className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700"
+              disabled={loading}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
               onClick={() => setIsModalOpen(true)}
             >
-              Invite
+              Send Invite
             </button>
           </div>
 
-          {/* Search Input */}
-          <div className="relative mt-2.5 mb-7">
-            <div className="absolute inset-y-0 left-0 flex items-center pointer-events-none">
-              <IoMdSearch className="mt-0.5 ml-3" />
+          {/* Loading State */}
+          {loading && (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
             </div>
-            <input
-              type="text"
-              className="bg-white text-sm w-full pl-9 pr-2 py-2 rounded-full border border-gray-300 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              placeholder="Search requests"
-            />
-          </div>
+          )}
 
-          {/* Requests Badge */}
-          <div className="mb-3">
-            <span className="bg-gray-200 px-3 py-1 rounded-full text-gray-700 text-sm">
-              Requests ({requests.length})
-            </span>
+          {/* Invites Content */}
+          <div className="flex-1 overflow-y-auto mt-4">
+            {renderInviteList()}
           </div>
-
-          {renderInviteList()}
 
           {/* Modal for Sending Invite */}
           {isModalOpen && (
@@ -257,23 +389,36 @@ const SidebarRight = ({
                 <button
                   className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
                   onClick={() => setIsModalOpen(false)}
+                  disabled={loading}
                 >
                   <FaTimes size={18} />
                 </button>
-                <h3 className="text-lg font-semibold mb-4">Invite Users</h3>
-                <div className="flex mb-4">
+                <h3 className="text-lg font-semibold mb-4">Send Invite</h3>
+                <div className="mb-4">
                   <input
                     type="email"
                     placeholder="Enter user email"
-                    className="flex-1 border border-gray-300 rounded-l-md px-3 py-2 outline-none focus:ring-1 focus:ring-green-500"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:ring-1 focus:ring-green-500"
                     value={receiverEmail}
                     onChange={(e) => setReceiverEmail(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && handleSendInvite()}
+                    disabled={loading}
                   />
+                </div>
+                <div className="flex justify-end space-x-2">
                   <button
-                    className="bg-green-600 text-white px-4 py-2 rounded-r-md hover:bg-green-700"
-                    onClick={handleSendInvite}
+                    className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 disabled:opacity-50"
+                    onClick={() => setIsModalOpen(false)}
+                    disabled={loading}
                   >
-                    Send
+                    Cancel
+                  </button>
+                  <button
+                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                    onClick={handleSendInvite}
+                    disabled={loading}
+                  >
+                    {loading ? "Sending..." : "Send Invite"}
                   </button>
                 </div>
               </div>
@@ -295,9 +440,12 @@ const SidebarRight = ({
               {isDropdownOpen && (
                 <div className="absolute -right-6 mt-2 w-44 bg-white rounded-lg shadow-lg py-1 z-10">
                   <div className="px-2">
-                    <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md">
+                    <button
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 w-full rounded-md"
+                      onClick={() => setActiveView("invite")}
+                    >
                       <MdOutlineGroupAdd className="text-lg" />
-                      <span className="ml-2">New Group</span>
+                      <span className="ml-2">Invite Users</span>
                     </button>
                   </div>
                   <div className="px-2">
@@ -354,10 +502,11 @@ const SidebarRight = ({
 
           {/* Chat List */}
           <ChatList
-            filteredChats={activeChat}
+            filteredChats={chats}
             activeChat={activeChat}
             setActiveChat={setActiveChat}
             currentUserId={currentUserId}
+            onChatOpen={handleChatOpen}
           />
         </>
       )}
