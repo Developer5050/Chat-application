@@ -12,7 +12,13 @@ import {
   MdEvent,
 } from "react-icons/md";
 import { FcInvite } from "react-icons/fc";
-import { FaEllipsisVertical, FaPlus, FaMicrophone } from "react-icons/fa6";
+import {
+  FaEllipsisVertical,
+  FaPlus,
+  FaMicrophone,
+  FaCheck,
+  FaCheckDouble,
+} from "react-icons/fa6";
 import { FaPoll, FaTimes, FaRegSmile } from "react-icons/fa";
 import {
   IoSend,
@@ -26,21 +32,17 @@ import {
   IoMdPhotos,
 } from "react-icons/io";
 import { LuThumbsDown } from "react-icons/lu";
-import { BiMessageSquareCheck } from "react-icons/bi";
 import { BsMicMute } from "react-icons/bs";
-import { SlSpeedometer } from "react-icons/sl";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { PiVideoCameraFill } from "react-icons/pi";
 import EmojiPicker from "emoji-picker-react";
 import whatsappBg from "../../assets/whatsapp1.jpg";
-import io from "socket.io-client";
-import Peer from "simple-peer";
 import { getChat, sendMessage } from "../../service/chatApiService";
-
-const socket = io("http://localhost:5000");
+import socket from "../../socket/Socket";
 
 const ChatArea = ({
   chats,
+  setChats,
   activeChat,
   messages,
   setMessages,
@@ -55,15 +57,35 @@ const ChatArea = ({
   const [loading, setLoading] = useState(false);
   const [currentChat, setCurrentChat] = useState(null);
 
-  // Video/Audio Call States
-  const [stream, setStream] = useState(null);
-  const [call, setCall] = useState({});
-  const [callAccepted, setCallAccepted] = useState(false);
-  const myVideo = useRef(null);
-  const userVideo = useRef(null);
-  const connectionRef = useRef();
+  // Refs
   const emojiPickerRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const plusRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+
+  // Click outside handlers
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+      if (plusRef.current && !plusRef.current.contains(event.target)) {
+        setOpenPlus(false);
+      }
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Memoized Active Chat Data
   const activeChatData = useMemo(() => {
@@ -71,20 +93,18 @@ const ChatArea = ({
     return chats.find((c) => c._id === activeChat._id) || activeChat;
   }, [chats, activeChat]);
 
-  // Scroll to bottom of messages
+  // Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Load chat details and messages when active chat changes
+  // Load chat details & messages
   useEffect(() => {
     const loadChatDetails = async () => {
       if (!activeChat?._id) return;
-
       try {
         setLoading(true);
         const response = await getChat(activeChat._id);
@@ -96,22 +116,12 @@ const ChatArea = ({
         setLoading(false);
       }
     };
-
     loadChatDetails();
   }, [activeChat, setMessages]);
-
-  // Receiver (other participants)
-  const receiverIds = useMemo(() => {
-    if (!activeChatData?.participants) return [];
-    return activeChatData.participants
-      .filter((p) => p._id !== userId)
-      .map((p) => p._id);
-  }, [activeChatData, userId]);
 
   // Chat display name
   const chatDisplayName = useMemo(() => {
     if (!activeChatData) return "Loading...";
-
     if (activeChatData.type === "direct") {
       const otherUser = activeChatData.participants?.find(
         (p) => p._id !== userId
@@ -123,10 +133,9 @@ const ChatArea = ({
     return "Unknown Chat";
   }, [activeChatData, userId]);
 
-  // Chat participants list (for group chats)
+  // Participants List
   const participantsList = useMemo(() => {
     if (!activeChatData?.participants) return "";
-
     if (activeChatData.type === "direct") {
       const otherUser = activeChatData.participants.find(
         (p) => p._id !== userId
@@ -148,127 +157,247 @@ const ChatArea = ({
     [setNewMessage]
   );
 
-  // Click outside to close emoji picker
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        emojiPickerRef.current &&
-        !emojiPickerRef.current.contains(event.target)
-      ) {
-        setShowEmojiPicker(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Handle Enter key press
+  // Enter press
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
       handleSend();
     }
   };
 
-  // Send Message
+  // ✅ Send message with proper status flow (FIXED)
   const handleSend = async () => {
     if (!newMessage.trim() || !activeChat?._id) return;
 
+    const tempMessage = {
+      _id: `temp-${Date.now()}`,
+      text: newMessage,
+      sender: userId,
+      chatId: activeChat._id,
+      status: "sent",
+      createdAt: new Date().toISOString(),
+      isTemp: true,
+    };
+
+    setMessages((prev) => [...prev, tempMessage]);
+    setNewMessage("");
+
     try {
       const response = await sendMessage(activeChat._id, newMessage);
-      const newMsg = response.chat.messages[response.chat.messages.length - 1];
+      const serverMessage =
+        response.chat.messages[response.chat.messages.length - 1];
 
-      setMessages((prev) => [...prev, newMsg]);
-      setNewMessage("");
-      setShowEmojiPicker(false);
+      // delivered by default (gray double tick)
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempMessage._id
+            ? { ...serverMessage, status: "delivered" }
+            : msg
+        )
+      );
+
+      socket.emit("send-message", {
+        chatId: activeChat._id,
+        message: { ...serverMessage, status: "delivered" },
+      });
     } catch (error) {
-      console.error("Error sending message:", error);
-      alert("Failed to send message");
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempMessage._id ? { ...msg, status: "failed" } : msg
+        )
+      );
     }
   };
 
-  // Media & Socket Setup (for calls - optional)
+  // ✅ Jab User 2 message receive kare tab 'delivered' mark karein (FIXED)
   useEffect(() => {
-    // Initialize media devices for calls
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
-      .then((currentStream) => {
-        setStream(currentStream);
-        if (myVideo.current) myVideo.current.srcObject = currentStream;
-      })
-      .catch((error) => {
-        console.warn("Media devices not available:", error);
-      });
+    if (!socket) return;
 
-    // Socket setup for real-time features
-    if (userId) {
-      socket.emit("join", userId);
+    const handleReceiveMessage = (message) => {
+      if (activeChat?._id === message.chatId) {
+        // ✅ Check karein ki message pehle se nahi hai
+        setMessages((prev) => {
+          const messageExists = prev.some((msg) => msg._id === message._id);
+          if (messageExists) return prev;
 
-      socket.on("call-made", ({ from, signal }) =>
-        setCall({ isReceivingCall: true, from, signal })
-      );
+          // ✅ New message ko 'delivered' status ke saath add karein
+          const deliveredMessage = { ...message, status: "delivered" };
+          const updatedMessages = [...prev, deliveredMessage];
 
-      socket.on("call-accepted", (signal) => {
-        setCallAccepted(true);
-        connectionRef.current?.signal(signal);
-      });
+          return updatedMessages;
+        });
 
-      // Listen for new messages
-      socket.on("new-message", (message) => {
-        if (message.chat === activeChat?._id) {
-          setMessages((prev) => [...prev, message]);
-        }
-      });
+        // ✅ Automatically 'delivered' emit karein (1 second delay ke saath)
+        setTimeout(() => {
+          socket.emit("message-delivered", {
+            chatId: activeChat._id,
+            messageId: message._id,
+            receiverId: userId,
+          });
+        }, 1000);
+      }
+    };
 
-      return () => {
-        socket.off("call-made");
-        socket.off("call-accepted");
-        socket.off("new-message");
-      };
-    }
-  }, [userId, activeChat]);
+    socket.on("receive-message", handleReceiveMessage);
 
-  // Call Functions (optional feature)
-  const callUser = useCallback(
-    (id) => {
-      if (!id || !stream) return;
-      const peer = new Peer({ initiator: true, trickle: false, stream });
+    return () => {
+      socket.off("receive-message", handleReceiveMessage);
+    };
+  }, [socket, activeChat, userId, messages]);
 
-      peer.on("signal", (data) =>
-        socket.emit("call-user", {
-          userToCall: id,
-          signalData: data,
-          from: userId,
-        })
-      );
+  // ✅ Jab User 2 chat open kare aur messages dekhe tab 'seen' mark karein (FIXED)
+  const markMessagesAsSeen = useCallback(() => {
+    if (!activeChat?._id || !socket) return;
 
-      peer.on("stream", (currentStream) => {
-        if (userVideo.current) userVideo.current.srcObject = currentStream;
-      });
-
-      connectionRef.current = peer;
-    },
-    [stream, userId]
-  );
-
-  const answerCall = useCallback(() => {
-    if (!call.from || !stream) return;
-
-    setCallAccepted(true);
-    const peer = new Peer({ initiator: false, trickle: false, stream });
-
-    peer.on("signal", (data) =>
-      socket.emit("answer-call", { to: call.from, signal: data })
+    const unseenMessages = messages.filter(
+      (msg) => msg.sender !== userId && msg.status === "delivered"
     );
 
-    peer.on("stream", (currentStream) => {
-      if (userVideo.current) userVideo.current.srcObject = currentStream;
+    if (!unseenMessages.length) return;
+
+    unseenMessages.forEach((msg) => {
+      // locally update receiver view (optional)
+      setMessages((prev) =>
+        prev.map((m) => (m._id === msg._id ? { ...m, status: "seen" } : m))
+      );
+
+      // notify sender that message is seen
+      socket.emit("seen-message", {
+        chatId: activeChat._id,
+        messageId: msg._id,
+        seenBy: userId,
+      });
     });
+  }, [activeChat, messages, userId, socket]);
 
-    peer.signal(call.signal);
-    connectionRef.current = peer;
-  }, [call, stream]);
+  // Jab chat open ho ya user scroll/click kare
+  useEffect(() => {
+    markMessagesAsSeen();
 
-  // --- Render special views ---
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleInteraction = () => markMessagesAsSeen();
+
+    container.addEventListener("scroll", handleInteraction);
+    container.addEventListener("click", handleInteraction);
+
+    return () => {
+      container.removeEventListener("scroll", handleInteraction);
+      container.removeEventListener("click", handleInteraction);
+    };
+  }, [markMessagesAsSeen]);
+
+  // 1️⃣ Handle joining and receiving messages
+  useEffect(() => {
+    if (!userId) return;
+
+    socket.emit("join", userId);
+
+    const handleReceiveMessage = (message) => {
+      setMessages((prev) => {
+        const exists = prev.some((msg) => msg._id === message._id);
+        if (exists) return prev;
+
+        return [...prev, { ...message, status: "delivered" }];
+      });
+
+      // Emit delivered status after 0.5s
+      setTimeout(() => {
+        socket.emit("message-delivered", {
+          chatId: message.chatId,
+          messageId: message._id,
+          receiverId: userId,
+        });
+      }, 500);
+    };
+
+    socket.on("receive-message", handleReceiveMessage);
+
+    // Cleanup on unmount
+    return () => {
+      socket.off("receive-message", handleReceiveMessage);
+    };
+  }, [userId]);
+
+  // 2️⃣ Handle message status updates
+  useEffect(() => {
+    if (!socket || !userId) return;
+
+    const handleMessageStatus = ({ messageId, status }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === messageId ? { ...msg, status } : msg))
+      );
+    };
+
+    socket.on("message-status", handleMessageStatus);
+
+    return () => {
+      socket.off("message-status", handleMessageStatus);
+    };
+  }, [socket, userId]);
+
+  // ✅ Chat updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleChatUpdated = (data) => {
+      setChats((prevChats) =>
+        prevChats.map((chat) =>
+          chat._id === data.chatId
+            ? {
+                ...chat,
+                lastMessage: data.lastMessage,
+                updatedAt: data.updatedAt,
+                unreadCount:
+                  activeChat?._id === data.chatId
+                    ? 0
+                    : (chat.unreadCount || 0) + 1,
+              }
+            : chat
+        )
+      );
+    };
+
+    socket.on("chat-updated", handleChatUpdated);
+
+    return () => {
+      socket.off("chat-updated", handleChatUpdated);
+    };
+  }, [socket, activeChat, setChats]);
+
+  // ✅ Reset unread count on open
+  useEffect(() => {
+    if (activeChat?._id) {
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat._id === activeChat._id ? { ...chat, unreadCount: 0 } : chat
+        )
+      );
+    }
+  }, [activeChat, setChats]);
+
+  // ✅ Render tick status (Correct flow)
+  // Status icon renderer
+  const renderStatusIcon = (message) => {
+    const isSender =
+      message.sender?._id === userId || message.sender === userId;
+    if (!isSender) return null;
+
+    switch (message.status) {
+      case "failed":
+        return <FaTimes size={12} className="text-red-500 ml-1" />;
+      case "sent":
+        return <FaCheck size={14} className="text-gray-500 ml-1" />;
+      case "delivered":
+        return <FaCheckDouble size={14} className="text-gray-500 ml-1" />;
+      case "seen":
+        return <FaCheckDouble size={14} className="text-blue-500 ml-1" />;
+      default:
+        return null;
+    }
+  };
+
+  // --- Special Views ---
   if (activeView === "invite") {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
@@ -321,114 +450,142 @@ const ChatArea = ({
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 text-gray-600 text-xl">
-          {/* Call buttons - only for direct chats */}
-          {activeChatData.type === "direct" && receiverIds.length > 0 && (
-            <>
-              <button
-                className="w-10 h-10 flex items-center justify-center hover:bg-gray-200 rounded-full"
-                onClick={() => callUser(receiverIds[0])}
-                title="Video Call"
-              >
-                <PiVideoCameraFill />
-              </button>
-              <button
-                className="w-10 h-10 flex items-center justify-center hover:bg-gray-200 rounded-full"
-                onClick={() => callUser(receiverIds[0])}
-                title="Voice Call"
-              >
-                <MdLocalPhone />
-              </button>
-            </>
-          )}
-
-          {/* Dropdown */}
-          <div className="relative">
+        <div className="flex items-center text-gray-600 space-x-3">
+          <button className="p-2 rounded-full hover:bg-gray-100">
+            <PiVideoCameraFill size={22} className="text-gray-700" />
+          </button>
+          <button className="p-2 rounded-full hover:bg-gray-100">
+            <MdLocalPhone size={20} className="text-gray-700" />
+          </button>
+          <div className="relative" ref={dropdownRef}>
             <button
-              className="w-10 h-10 flex items-center justify-center hover:bg-gray-200 rounded-full"
-              onClick={() => setIsDropdownOpen((prev) => !prev)}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="p-2 rounded-full hover:bg-gray-100"
             >
-              <FaEllipsisVertical />
+              <FaEllipsisVertical size={20} className="text-gray-700" />
             </button>
+
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-1 w-60 bg-white rounded-xl shadow-2xl py-1 z-10">
-                {[
-                  { icon: IoMdInformationCircleOutline, label: "Chat Info" },
-                  { icon: BiMessageSquareCheck, label: "Select messages" },
-                  { icon: BsMicMute, label: "Mute notifications" },
-                  { icon: MdFavoriteBorder, label: "Add to favourites" },
-                  { icon: IoCloseCircleOutline, label: "Close chat" },
-                  ...(activeChatData.type === "group"
-                    ? [{ icon: IoPerson, label: "Add participants" }]
-                    : []),
-                  { icon: LuThumbsDown, label: "Report", red: true },
-                  { icon: MdBlockFlipped, label: "Block", red: true },
-                  {
-                    icon: IoIosRemoveCircleOutline,
-                    label: "Clear chat",
-                    red: true,
-                  },
-                  { icon: RiDeleteBin6Line, label: "Delete Chat", red: true },
-                ].map((item, idx) => (
-                  <div key={idx} className="px-2">
-                    <button
-                      className={`flex items-center px-4 py-2 text-sm w-full rounded-md ${
-                        item.red
-                          ? "text-red-700 hover:bg-red-100"
-                          : "text-gray-700 hover:bg-gray-200"
-                      }`}
-                      onClick={() => setIsDropdownOpen(false)}
-                    >
-                      <item.icon className="text-lg mr-3" />
-                      <span>{item.label}</span>
-                    </button>
-                  </div>
-                ))}
+              <div className="absolute right-4 top-8 w-48 bg-white rounded-lg shadow-lg border z-50">
+                <ul className="py-1 text-[15px] text-gray-700">
+                  <li className="px-2">
+                    <div className="flex items-center px-2 py-2 rounded-md hover:bg-gray-200 cursor-pointer">
+                      <IoMdInformationCircleOutline
+                        className="mr-2 text-gray-600 mt-0.5"
+                        size={18}
+                      />
+                      Contact Info
+                    </div>
+                  </li>
+                  <li className="px-2">
+                    <div className="flex items-center px-2 py-2 rounded-md hover:bg-gray-200 cursor-pointer">
+                      <BsMicMute
+                        className="mr-2 text-gray-600 mt-0.5"
+                        size={18}
+                      />
+                      Mute Notifications
+                    </div>
+                  </li>
+                  <li className="px-2">
+                    <div className="flex items-center px-2 py-2 rounded-md hover:bg-gray-200 cursor-pointer">
+                      <MdFavoriteBorder
+                        className="mr-2 text-gray-600 mt-0.5"
+                        size={18}
+                      />
+                      Add to favourites
+                    </div>
+                  </li>
+                  <li className="px-2 mb-1">
+                    <div className="flex items-center px-2 py-2 rounded-md hover:bg-gray-200 cursor-pointer">
+                      <IoCloseCircleOutline
+                        className="mr-2 text-gray-600 mt-0.5"
+                        size={18}
+                      />
+                      Close chat
+                    </div>
+                  </li>
+                  <hr className="h-0.5 bg-gray-200 w-44 mx-auto" />
+                  <li className="px-2 mt-1">
+                    <div className="flex items-center px-2 py-2 rounded-md hover:bg-red-200 cursor-pointer">
+                      <LuThumbsDown
+                        className="mr-2 text-gray-600 mt-0.5"
+                        size={18}
+                      />
+                      Report
+                    </div>
+                  </li>
+                  <li className="px-2">
+                    <div className="flex items-center px-2 py-2 rounded-md hover:bg-red-200 cursor-pointer">
+                      <MdBlockFlipped
+                        className="mr-2 text-gray-600 mt-0.5"
+                        size={18}
+                      />
+                      Block
+                    </div>
+                  </li>
+                  <li className="px-2">
+                    <div className="flex items-center px-2 py-2 rounded-md hover:bg-red-200 cursor-pointer">
+                      <IoIosRemoveCircleOutline
+                        className="mr-2 text-gray-600 mt-0.5"
+                        size={18}
+                      />
+                      Clear chat
+                    </div>
+                  </li>
+                  <li className="px-2">
+                    <div className="flex items-center px-2 py-2 rounded-md hover:bg-red-200 cursor-pointer">
+                      <RiDeleteBin6Line
+                        className="mr-2 text-gray-600 mt-0.5"
+                        size={18}
+                      />
+                      Delete chat
+                    </div>
+                  </li>
+                </ul>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Loading State */}
-      {loading && (
-        <div className="flex justify-center items-center p-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-        </div>
-      )}
-
       {/* Messages */}
       <div
+        ref={messagesContainerRef}
         className="flex-1 p-4 overflow-y-auto bg-cover bg-center"
         style={{ backgroundImage: `url(${whatsappBg})` }}
       >
         <div className="space-y-3">
-          {messages.map((message) => (
-            <div
-              key={message._id || message.createdAt}
-              className={`flex ${
-                message.sender?._id === userId || message.sender === userId
-                  ? "justify-end"
-                  : "justify-start"
-              }`}
-            >
+          {messages.map((message) => {
+            const isSender =
+              message.sender?._id === userId || message.sender === userId;
+
+            return (
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                  message.sender?._id === userId || message.sender === userId
-                    ? "bg-green-100 text-gray-800 border border-green-200"
-                    : "bg-white text-gray-800 border border-gray-200"
-                }`}
+                key={message._id || message.createdAt}
+                className={`flex ${isSender ? "justify-end" : "justify-start"}`}
               >
-                <p className="text-sm">{message.text}</p>
-                <p className="text-xs text-gray-500 text-right mt-1">
-                  {new Date(message.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
+                <div
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                    isSender
+                      ? "bg-green-100 text-gray-800 border border-green-200"
+                      : "bg-white text-gray-800 border border-gray-200"
+                  } ${message.status === "failed" ? "opacity-70" : ""}`}
+                >
+                  <p className="text-sm">{message.text}</p>
+
+                  <div className="flex items-center justify-end space-x-1 mt-1">
+                    <p className="text-xs text-gray-500">
+                      {new Date(message.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                    {renderStatusIcon(message)}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
 
@@ -442,8 +599,10 @@ const ChatArea = ({
 
       {/* Input Area */}
       <div className="p-3 flex items-center bg-white relative">
-        <div className="flex-1 flex items-center rounded-full px-3 py-2 shadow-sm border border-gray-300 bg-white relative">
-          {/* Plus button for attachments */}
+        <div
+          className="flex-1 flex items-center rounded-full px-3 py-2 shadow-sm border border-gray-300 bg-white relative"
+          ref={plusRef}
+        >
           <button
             type="button"
             onClick={() => setOpenPlus((prev) => !prev)}
@@ -453,33 +612,29 @@ const ChatArea = ({
           </button>
 
           {openPlus && (
-            <div className="absolute bottom-14 left-0 bg-white border rounded-xl shadow-md w-48 p-1 z-10">
-              {[
-                {
-                  icon: IoDocumentText,
-                  label: "Document",
-                  color: "text-purple-500",
-                },
-                {
-                  icon: IoMdPhotos,
-                  label: "Photos & videos",
-                  color: "text-blue-500",
-                },
-                { icon: IoPerson, label: "Contact", color: "text-cyan-500" },
-                { icon: FaPoll, label: "Poll", color: "text-yellow-500" },
-                { icon: MdEvent, label: "Event", color: "text-pink-500" },
-              ].map((item, idx) => (
-                <div key={idx} className="px-2">
-                  <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-md">
-                    <item.icon className={`text-lg ${item.color} mr-3`} />
-                    <span>{item.label}</span>
-                  </button>
-                </div>
-              ))}
+            <div className="absolute bottom-12 left-0 w-48 bg-white rounded-lg shadow-lg border z-50">
+              <ul className="py-1 text-[15px] text-gray-700">
+                <li className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                  <IoDocumentText className="mr-2 text-purple-600" size={18} />{" "}
+                  Document
+                </li>
+                <li className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                  <IoMdPhotos className="mr-2 text-blue-600" size={18} /> Photos
+                  & Videos
+                </li>
+                <li className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                  <IoPerson className="mr-2 text-cyan-600" size={18} /> Contact
+                </li>
+                <li className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                  <FaPoll className="mr-2 text-yellow-600" size={18} /> Poll
+                </li>
+                <li className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                  <MdEvent className="mr-2 text-pink-600" size={18} /> Event
+                </li>
+              </ul>
             </div>
           )}
 
-          {/* Emoji button */}
           <button
             className="text-gray-600 hover:text-gray-800 mr-3"
             onClick={() => setShowEmojiPicker((prev) => !prev)}
@@ -487,7 +642,6 @@ const ChatArea = ({
             <FaRegSmile size={18} />
           </button>
 
-          {/* Message input */}
           <input
             type="text"
             className="flex-1 focus:outline-none bg-transparent text-gray-800"
@@ -498,7 +652,6 @@ const ChatArea = ({
             disabled={loading}
           />
 
-          {/* Send/Mic button */}
           {newMessage.trim() === "" ? (
             <button className="text-gray-600 hover:text-gray-800 ml-3 p-2 rounded-full">
               <FaMicrophone size={18} />
@@ -514,7 +667,6 @@ const ChatArea = ({
           )}
         </div>
 
-        {/* Emoji Picker */}
         {showEmojiPicker && (
           <div
             ref={emojiPickerRef}

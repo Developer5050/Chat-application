@@ -107,6 +107,7 @@ const ChatUi = () => {
       {/* Chat Area */}
       <ChatArea
         chats={chats}
+        setChats={setChats}
         activeChat={activeChat}
         messages={messages}
         setMessages={setMessages}

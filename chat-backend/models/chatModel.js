@@ -7,6 +7,12 @@ const messageSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    
+    status: { 
+    type: String, 
+    enum: ['sent', 'delivered', 'seen', 'failed'],
+    default: 'sent'
+  },
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
   },

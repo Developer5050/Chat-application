@@ -5,7 +5,6 @@ const ChatList = ({
   activeChat,
   setActiveChat,
   currentUserId,
-  onChatOpen,
 }) => {
   // Function to get display name for chat
   const getChatDisplayName = (chat) => {
@@ -45,8 +44,8 @@ const ChatList = ({
                 activeChat?._id === chat._id ? "bg-gray-200" : ""
               }`}
               onClick={() => {
-                // Simply set the active chat - no need to call API again
-                setActiveChat(chat);
+                // Open this chat & reset unread count
+                setActiveChat({ ...chat, unreadCount: 0 });
               }}
             >
               {/* Chat avatar */}
@@ -56,6 +55,7 @@ const ChatList = ({
 
               {/* Chat info */}
               <div className="flex-1 min-w-0">
+                {/* Top row: Name + Time */}
                 <div className="flex justify-between items-center">
                   <p className="font-medium text-gray-800 truncate">
                     {displayName}
@@ -69,9 +69,23 @@ const ChatList = ({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 truncate">{lastMessage}</p>
+
+                {/* Bottom row: Last message + Unread badge */}
+                <div className="flex justify-between items-center mt-0.5">
+                  <p className="text-xs text-gray-500 truncate flex-1">
+                    {lastMessage}
+                  </p>
+
+                  {chat.unreadCount > 0 && (
+                    <span className="ml-2 bg-green-500 text-white text-xs font-semibold rounded-full px-2 py-0.5">
+                      {chat.unreadCount}
+                    </span>
+                  )}
+                </div>
+
+                {/* Group info */}
                 {chat.type === "group" && (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 mt-1">
                     {chat.participants?.length || 0} participants
                   </p>
                 )}
